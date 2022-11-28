@@ -1,8 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <errno.h>
-#include <string.h>
-
+#include <string.h> 
 #include "server2.h"
 #include "client2.h"
 
@@ -110,30 +109,48 @@ static void app(void)
       }
       else
       {
-         int i = 0;
+         /*Extracting -m command*/
+         char destination[BUF_SIZE];
+         if (buffer[0]=='-'){
+            if (buffer[1]=='m'){
+               
+               int i = 3;
+               while (buffer[i]!=' '&&i<BUF_SIZE){
+                  destination[i-3]=buffer[i];
+                  i++;
+               }
+               destination[i-3]='\0';
+            }
+        }   
+    
+        
          for(i = 0; i < actual; i++)
          {
             /* a client is talking */
             if(FD_ISSET(clients[i].sock, &rdfs))
             {
                Client client = clients[i];
-               int c = read_client(clients[i].sock, buffer);
-               printf("Message from %s : %s \n", client.name,buffer);
-               /* client disconnected */
-               if(c == 0)
-               {
-                  closesocket(clients[i].sock);
-                  remove_client(clients, i, &actual);
-                  strncpy(buffer, client.name, BUF_SIZE - 1);
-                  printf("%s left the server ! \n", client.name);
-                  strncat(buffer, " disconnected !", BUF_SIZE - strlen(buffer) - 1);
-                  send_message_to_all_clients(clients, client, actual, buffer, 1);
+               printf("%s ",destination);
+               if (strcmp(destination,client.name)==0){
+                  int c = read_client(clients[i].sock,buffer);
+                  printf("Message from %s to %s : %s \n", client.name,destination,buffer);
+                  /* client disconnected */
+                  if(c == 0)
+                  {
+                     closesocket(clients[i].sock);
+                     remove_client(clients, i, &actual);
+                     strncpy(buffer, client.name, BUF_SIZE - 1);
+                     printf("%s left the server ! \n", client.name);
+                     strncat(buffer, " disconnected !", BUF_SIZE - strlen(buffer) - 1);
+                     send_message_to_all_clients(clients, client, actual, buffer, 1);
+                  }
+                  else
+                  {
+                     memmove(buffer,buffer+4+strlen(destination),strlen(buffer));
+                     write_client(client.sock,buffer);
+                  }
+                  break;
                }
-               else
-               {
-                  send_message_to_all_clients(clients, client, actual, buffer, 0);
-               }
-               break;
             }
          }
       }
