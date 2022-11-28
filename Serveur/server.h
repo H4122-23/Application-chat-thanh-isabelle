@@ -33,8 +33,9 @@ typedef struct in_addr IN_ADDR;
 
 #define BUF_SIZE    1024
 
-#include "client2.h"
+#include "client.h"
 
+enum COMMANDS{NULL,DIRECT_MESSAGE,GROUP_CHAT};
 static void init(void);
 static void end(void);
 static void app(void);
