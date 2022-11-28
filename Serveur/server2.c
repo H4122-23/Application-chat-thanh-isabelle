@@ -106,12 +106,14 @@ static void app(void)
             {
                Client client = clients[i];
                int c = read_client(clients[i].sock, buffer);
+               printf("Message from %s : %s \n", client.name,buffer);
                /* client disconnected */
                if(c == 0)
                {
                   closesocket(clients[i].sock);
                   remove_client(clients, i, &actual);
                   strncpy(buffer, client.name, BUF_SIZE - 1);
+                  printf("%s left the server ! \n", client.name);
                   strncat(buffer, " disconnected !", BUF_SIZE - strlen(buffer) - 1);
                   send_message_to_all_clients(clients, client, actual, buffer, 1);
                }
