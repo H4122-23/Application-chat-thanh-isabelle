@@ -90,11 +90,23 @@ static void app(void)
          max = csock > max ? csock : max;
 
          FD_SET(csock, &rdfs);
-
+         int duplicated = 0;
          Client c = { csock };
-         strncpy(c.name, buffer, BUF_SIZE - 1);
-         clients[actual] = c;
-         actual++;
+         /*Check if the client exists*/
+         for(int i = 0; i < actual; i++)
+         {
+            if(strcmp(buffer,clients[i].name)==0){
+               write_client(c.sock, "This pseudoname has been taken. Please choose a new one! ");
+               closesocket(c.sock);
+               duplicated = 1;
+               break;
+            }
+         }
+         if (!duplicated){
+            strncpy(c.name, buffer, BUF_SIZE - 1);
+            clients[actual] = c;
+            actual++;
+         }
       }
       else
       {
@@ -106,12 +118,14 @@ static void app(void)
             {
                Client client = clients[i];
                int c = read_client(clients[i].sock, buffer);
+               printf("Message from %s : %s \n", client.name,buffer);
                /* client disconnected */
                if(c == 0)
                {
                   closesocket(clients[i].sock);
                   remove_client(clients, i, &actual);
                   strncpy(buffer, client.name, BUF_SIZE - 1);
+                  printf("%s left the server ! \n", client.name);
                   strncat(buffer, " disconnected !", BUF_SIZE - strlen(buffer) - 1);
                   send_message_to_all_clients(clients, client, actual, buffer, 1);
                }
@@ -205,11 +219,10 @@ static void end_connection(int sock)
 static int read_client(SOCKET sock, char *buffer)
 {
    int n = 0;
-
    if((n = recv(sock, buffer, BUF_SIZE - 1, 0)) < 0)
    {
       perror("recv()");
-      /* if recv error we disonnect the client */
+      /* if recv error we disconnect the client */
       n = 0;
    }
 
