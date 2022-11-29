@@ -2,3 +2,4 @@
 # Compiled source #
 ###################
 *.o
+*.json
