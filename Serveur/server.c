@@ -118,15 +118,12 @@ static void app(void)
             /* a client is talking */
             if(FD_ISSET(clients[i].sock, &rdfs))
             {
-               printf("Another checkpoint segfaut");
                Client client = clients[i];
                int c = read_client(clients[i].sock,buffer);
                //printf("Message from %s : %s \n", client.name,buffer);
-               printf("Checkpoint segfaut");
                /* client disconnected */
                if(c == 0)
                {
-                  printf("Checkpoint0");
                   closesocket(clients[i].sock);
                   remove_client(clients, i, &actual);
                   strncpy(buffer, client.name, BUF_SIZE - 1);
@@ -139,36 +136,19 @@ static void app(void)
                   switch (c)
                   {
                   case DIRECT_MESSAGE:;
-                     /* Get destination client name*/
-                     char name[BUF_SIZE];
-                     int i = 3;
-                     while (buffer[i] != ' ' && i < BUF_SIZE)
-                     {
-                        name[i - 3] = buffer[i];
-                        i++;
-                     }
-                     name[i - 3] = '\0';
-
-                     /* Find client from name */
-                     Client *dest = NULL;
-                     for (i = 0; i < actual; i++)
-                     {
-                        if (strcmp(clients[i].name, name) == 0)
-                        {
-                           dest = &clients[i];
-                        }
-                     }
-
-                     if (dest == NULL)
+                     /* Find client from recipient's name entered by users*/
+                     int index_recipient = search_recipient(buffer,clients,actual);
+                     if (index_recipient==-1)
                      {
                         write_client(client.sock, "Destination user not found");
                      }
                      else
                      {
-                        /* Create a new buffer without the command and the name */
-                        memmove(buffer, buffer + 4 + strlen(name), strlen(buffer));
-
-                        /* Send the private message */
+                        /* Remove command and name from the buffer */
+                        Client* dest = &clients[index_recipient];
+                        memmove(buffer, buffer + 4 + strlen(dest->name), strlen(buffer));
+                         /* Send the private message */
+                        send_message_to_specified_client(*dest,client,buffer);
                         printf("Message sent\n");
                      }
                      break;
@@ -285,9 +265,9 @@ static void write_client(SOCKET sock, const char *buffer)
    }
 }
 
+/*Extract commands entered by users*/
 static enum COMMANDS get_command(const char* buffer){
-   printf(buffer);
-   if (buffer[0]=='/'){
+   if (buffer[0]=='-'){
       if (buffer[1]=='m')return DIRECT_MESSAGE;
       else if (buffer[1]=='g')return GROUP_CHAT;
       else return UNKNOWN;
@@ -295,27 +275,35 @@ static enum COMMANDS get_command(const char* buffer){
    }
 }
 
-static void send_message_to_specified_client(Client* clients, const char* buffer){
-   /*copy buffer to use strtok*/
-   char* delimiter =" ";
-   char* copy_buffer;
-   strncpy(copy_buffer,buffer,BUF_SIZE-1);
-   /*extract recipient's name and message*/
-   char* recipient_pseudo = strtok(copy_buffer,delimiter);
-   recipient_pseudo= strtok(NULL,delimiter);
-   char* message = strtok(NULL,delimiter);
-   printf("pseudo: %s, message: %s",recipient_pseudo,message);
-   int messageSent = 0;
-   /*search recipient in the array from his/her name*/
-   while (clients!=NULL&&!messageSent)
+/*Search for recipient in the list of clients*/
+static int search_recipient(const char* buffer,Client*clients, int actual){
+   char name[BUF_SIZE];
+   int i = 3;
+   while (buffer[i] != ' ' && i < BUF_SIZE)
    {
-      if (strcmp(clients->name, recipient_pseudo) == 0)
-      {
-         write_client(clients->sock,message);
-         messageSent=1;
-      }
-      clients++;
+      name[i - 3] = buffer[i];
+      i++;
    }
+   name[i - 3] = '\0';
+   /* Find client from name */
+   for (i = 0; i < actual; i++)
+   {
+      if (strcmp(clients[i].name, name) == 0)
+      {
+         return i;
+      }
+   }
+   return -1;
+}
+
+static void send_message_to_specified_client(Client recipient, Client sender, const char *buffer){
+   int i = 0;
+   char message[BUF_SIZE];
+   strcpy(message, "(");
+   strcat(message, sender.name);
+   strcat(message, ") : ");
+   strcat(message, buffer);
+   write_client(recipient.sock, message);
 }
 
 
