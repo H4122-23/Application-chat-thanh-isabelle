@@ -91,66 +91,94 @@ static void app(void)
          FD_SET(csock, &rdfs);
          int duplicated = 0;
          Client c = { csock };
+         strncpy(c.name, buffer, BUF_SIZE - 1);
          /*Check if the client exists*/
          for(int i = 0; i < actual; i++)
          {
-            if(strcmp(buffer,clients[i].name)==0){
+            if(strcmp(c.name,clients[i].name)==0){
                write_client(c.sock, "This pseudoname has been taken. Please choose a new one! ");
-               closesocket(c.sock);
                duplicated = 1;
                break;
             }
          }
-         if (!duplicated){
-            strncpy(c.name, buffer, BUF_SIZE - 1);
+         if (duplicated==0){
+           
             clients[actual] = c;
             actual++;
+         }else
+         {
+            closesocket(c.sock);
          }
       }
       else
       {
-         /*Extracting -m command*/
-         char destination[BUF_SIZE];
-         if (buffer[0]=='-'){
-            if (buffer[1]=='m'){
-               
-               int i = 3;
-               while (buffer[i]!=' '&&i<BUF_SIZE){
-                  destination[i-3]=buffer[i];
-                  i++;
-               }
-               destination[i-3]='\0';
-            }
-        }   
-    
-        
+         int i=0;
          for(i = 0; i < actual; i++)
          {
             /* a client is talking */
             if(FD_ISSET(clients[i].sock, &rdfs))
             {
+               printf("Another checkpoint segfaut");
                Client client = clients[i];
-               printf("%s ",destination);
-               if (strcmp(destination,client.name)==0){
-                  int c = read_client(clients[i].sock,buffer);
-                  printf("Message from %s to %s : %s \n", client.name,destination,buffer);
-                  /* client disconnected */
-                  if(c == 0)
+               int c = read_client(clients[i].sock,buffer);
+               //printf("Message from %s : %s \n", client.name,buffer);
+               printf("Checkpoint segfaut");
+               /* client disconnected */
+               if(c == 0)
+               {
+                  printf("Checkpoint0");
+                  closesocket(clients[i].sock);
+                  remove_client(clients, i, &actual);
+                  strncpy(buffer, client.name, BUF_SIZE - 1);
+                  printf("%s left the server ! \n", client.name);
+                  strncat(buffer, " disconnected !", BUF_SIZE - strlen(buffer) - 1);
+                  send_message_to_all_clients(clients, client, actual, buffer, 1);
+               }else{
+                  /*Get command entered by clients*/
+                  enum COMMANDS c = get_command(buffer);
+                  switch (c)
                   {
-                     closesocket(clients[i].sock);
-                     remove_client(clients, i, &actual);
-                     strncpy(buffer, client.name, BUF_SIZE - 1);
-                     printf("%s left the server ! \n", client.name);
-                     strncat(buffer, " disconnected !", BUF_SIZE - strlen(buffer) - 1);
-                     send_message_to_all_clients(clients, client, actual, buffer, 1);
+                  case DIRECT_MESSAGE:;
+                     /* Get destination client name*/
+                     char name[BUF_SIZE];
+                     int i = 3;
+                     while (buffer[i] != ' ' && i < BUF_SIZE)
+                     {
+                        name[i - 3] = buffer[i];
+                        i++;
+                     }
+                     name[i - 3] = '\0';
+
+                     /* Find client from name */
+                     Client *dest = NULL;
+                     for (i = 0; i < actual; i++)
+                     {
+                        if (strcmp(clients[i].name, name) == 0)
+                        {
+                           dest = &clients[i];
+                        }
+                     }
+
+                     if (dest == NULL)
+                     {
+                        write_client(client.sock, "Destination user not found");
+                     }
+                     else
+                     {
+                        /* Create a new buffer without the command and the name */
+                        memmove(buffer, buffer + 4 + strlen(name), strlen(buffer));
+
+                        /* Send the private message */
+                        printf("Message sent\n");
+                     }
+                     break;
+                  case UNKNOWN:
+                     write_client(client.sock, "Unknown command");
+                  default:
+                     break;
                   }
-                  else
-                  {
-                     memmove(buffer,buffer+4+strlen(destination),strlen(buffer));
-                     write_client(client.sock,buffer);
-                  }
-                  break;
-               }
+
+               }break;
             }
          }
       }
@@ -256,6 +284,41 @@ static void write_client(SOCKET sock, const char *buffer)
       exit(errno);
    }
 }
+
+static enum COMMANDS get_command(const char* buffer){
+   printf(buffer);
+   if (buffer[0]=='/'){
+      if (buffer[1]=='m')return DIRECT_MESSAGE;
+      else if (buffer[1]=='g')return GROUP_CHAT;
+      else return UNKNOWN;
+
+   }
+}
+
+static void send_message_to_specified_client(Client* clients, const char* buffer){
+   /*copy buffer to use strtok*/
+   char* delimiter =" ";
+   char* copy_buffer;
+   strncpy(copy_buffer,buffer,BUF_SIZE-1);
+   /*extract recipient's name and message*/
+   char* recipient_pseudo = strtok(copy_buffer,delimiter);
+   recipient_pseudo= strtok(NULL,delimiter);
+   char* message = strtok(NULL,delimiter);
+   printf("pseudo: %s, message: %s",recipient_pseudo,message);
+   int messageSent = 0;
+   /*search recipient in the array from his/her name*/
+   while (clients!=NULL&&!messageSent)
+   {
+      if (strcmp(clients->name, recipient_pseudo) == 0)
+      {
+         write_client(clients->sock,message);
+         messageSent=1;
+      }
+      clients++;
+   }
+}
+
+
 
 int main(int argc, char **argv)
 {

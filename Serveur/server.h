@@ -35,7 +35,6 @@ typedef struct in_addr IN_ADDR;
 
 #include "client.h"
 
-enum COMMANDS{NULL,DIRECT_MESSAGE,GROUP_CHAT};
 static void init(void);
 static void end(void);
 static void app(void);
@@ -46,5 +45,7 @@ static void write_client(SOCKET sock, const char *buffer);
 static void send_message_to_all_clients(Client *clients, Client client, int actual, const char *buffer, char from_server);
 static void remove_client(Client *clients, int to_remove, int *actual);
 static void clear_clients(Client *clients, int actual);
+static void send_message_to_specified_client(Client* clients, const char* buffer);
+static enum COMMANDS get_command(const char* buffer);
 
 #endif /* guard */
