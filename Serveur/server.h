@@ -56,7 +56,7 @@ static void remove_client(Client *clients, int to_remove, int *actual);
 static void clear_clients(Client *clients, int actual);
 static int search_recipient(const char* buffer,Client * clients, int actual);
 static void send_message_to_specified_client(Client recipient,Client sender, const char* buffer,int* nbCurrentMessage,Message* messages);
-static void save_history(Message* messages,int nbMessages);
+static void save_history(Message* message);
 static enum COMMANDS get_command(const char* buffer);
 
 #endif /* guard */

@@ -166,9 +166,9 @@ static void app(void)
                         printf("Message sent by %s at %s: %s \n",m.sender.name,dateString,m.content);
                      }
                      break;
-                  case SAVE_HISTORY:
+                  /*case SAVE_HISTORY:
                      save_history(messages,nbCurrentMessage);
-                     break;
+                     break;*/
                   default:
                      break;
                   }
@@ -286,7 +286,7 @@ static enum COMMANDS get_command(const char* buffer){
       if (buffer[1]=='m')return DIRECT_MESSAGE;
       else if (buffer[1]=='g')return GROUP_CHAT;
       else if (buffer[1]=='h')return SHOW_HISTORY;
-      else if (buffer[1]=='s')return SAVE_HISTORY;
+      //else if (buffer[1]=='s')return SAVE_HISTORY;
       else return UNKNOWN;
 
    }
@@ -326,7 +326,8 @@ static void send_message_to_specified_client(Client recipient, Client sender, co
    Message* newMessage = (Message*)malloc(sizeof(Message));
 	newMessage->timestamp = localtime(&t);
    write_client(recipient.sock, message);
-   /*Save message history*/
+
+   /*Save message history in the array messages*/
    strcpy(newMessage->content,buffer);
    newMessage->sender=sender;
    newMessage->recipient=recipient;
@@ -334,35 +335,37 @@ static void send_message_to_specified_client(Client recipient, Client sender, co
    messages[nbMessages] = *newMessage;
    nbMessages++;
    *nbCurrentMessage=nbMessages;
+
+   /*Save message history in the corresponding text files*/
+   save_history(newMessage);
 }
 
-static void save_history(Message* messages,int nbMessages){
-   for(int i=0;i<nbMessages;i++){
-      Message m = messages[i];
-      char filenameIn[MAX_FILENAME];
-      char filenameOut[MAX_FILENAME];
-      strcpy(filenameIn,m.recipient.name);
-      strcat(filenameIn,".txt");
-      strcpy(filenameOut,m.sender.name);
-      strcat(filenameOut,".txt");
-      FILE* fptrIn;
-      FILE* fptrOut;
-      fptrIn = fopen(filenameIn,"a");
-      fptrOut = fopen(filenameOut,"a");
-      if(fptrIn == NULL ||fptrOut ==NULL)
-      {
-         perror("Error when opening files.");   
-         return;             
-      }
-      char timestamp[30];
-      strftime(timestamp, 30, "%x - %I:%M%p", m.timestamp);
-      fprintf(fptrIn,"received from (%s) at %s: %s \n",m.sender.name,timestamp,m.content);
-      fprintf(fptrOut,"sent to (%s) at %s: %s \n",m.recipient.name,timestamp,m.content);
-      fclose(fptrIn);
-      fclose(fptrOut);
+/*Save message history in text files*/
+static void save_history(Message* m){
+   char filenameIn[MAX_FILENAME];
+   char filenameOut[MAX_FILENAME];
+   strcpy(filenameIn,m->recipient.name);
+   strcat(filenameIn,".txt");
+   strcpy(filenameOut,m->sender.name);
+   strcat(filenameOut,".txt");
+   FILE* fptrIn;
+   FILE* fptrOut;
+   fptrIn = fopen(filenameIn,"a");
+   fptrOut = fopen(filenameOut,"a");
+   if(fptrIn == NULL ||fptrOut ==NULL)
+   {
+      perror("Error when opening files.");   
+      return;             
    }
-   
+   char timestamp[30];
+   strftime(timestamp, 30, "%x - %I:%M%p", m->timestamp);
+   fprintf(fptrIn,"received from (%s) at %s: %s \n",m->sender.name,timestamp,m->content);
+   fprintf(fptrOut,"sent to (%s) at %s: %s \n",m->recipient.name,timestamp,m->content);
+   fclose(fptrIn);
+   fclose(fptrOut);
 }
+   
+
 
 
 
