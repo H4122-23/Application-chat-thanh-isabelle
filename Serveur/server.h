@@ -61,5 +61,7 @@ static void send_message_to_specified_client(Client recipient,Client sender, con
 static void save_history(Message* message);
 static void load_history(Client client);
 static enum COMMANDS get_command(const char* buffer);
+static char** gc_names(char* buffer);
+static int search_recipient1(const char* buffer,Client*clients, int actual);
 
 #endif /* guard */

@@ -4,7 +4,7 @@
 #include <string.h> 
 #include "server.h"
 #include "client.h"
-
+int num_names =0;
 static void init(void)
 {
 #ifdef WIN32
@@ -186,6 +186,26 @@ static void app(void)
                      strcat(newFilename,".txt");
                      rename(oldFilename,newFilename);
                      break;
+                  case GROUP_CHAT:
+                     printf("groupchat\n");
+                     char ** names = gc_names(buffer);
+                     printf("%s\n", buffer);
+                     int m=0;
+                     for(int m =0; m<num_names;m++){
+                        int index_recipient = search_recipient1(names[m],clients,actual);
+                        if (index_recipient==-1)
+                        {
+                           write_client(client.sock, "Destination user not found\n");
+                        }
+                        else{
+
+                           Client* dest = &clients[index_recipient];
+                          // memmove(buffer, buffer + 4 + strlen(dest->name), strlen(buffer));
+                           send_message_to_specified_client(*dest,client,buffer);
+                        }
+                        
+                     }
+                     break;
                   case UNKNOWN:
                      write_client(client.sock, "Unknown command");
                      break;
@@ -316,10 +336,39 @@ static enum COMMANDS get_command(const char* buffer){
       if (buffer[1]=='m' && buffer[2]==' ')return DIRECT_MESSAGE;
       else if (buffer[1]=='c' && buffer[2]==' ')return CHANGE_USERNAME;
       else if (buffer[1]=='o'&&strlen(buffer)==2)return ONLINE_USERS;
-      //else if (buffer[1]=='g')return GROUP_CHAT;
+      else if (buffer[1]=='g')return GROUP_CHAT;
       else return UNKNOWN;
    }
-   else return UNKNOWN;
+   
+}
+
+static char** gc_names(char* buffer){
+   char * token = strtok(buffer, " ");
+   char **names;
+   char **names_final;
+   int i=0; int j=0;
+   while( token != NULL ) {
+      //if(token[0]!='-'){
+         names[j] = token;
+         printf("%s\n", names[j]);
+         token = strtok(NULL, " ");
+         j++;
+      //}
+      i++;
+   }
+   num_names = j-1;
+   int k;
+      printf("%d is number of names in gc\n", num_names);
+   for(k = 0; k < j; k++){
+      char* temp = names[k+1];
+      //if(temp[0] == "-"){
+      //   break;
+      //}
+      names[k]=names[k+1];
+      printf("%s, %d\n", names[k],k);
+   }
+   names[k+1]="\0";
+   return names;
 }
 
 /*Extract username from the buffer*/
@@ -347,6 +396,7 @@ static int search_recipient(const char* name,Client*clients, int actual){
    }
    return -1;
 }
+
 
 /*Create message*/
 static Message* create_message(const char* buffer, const char* sender, const char* recipient, int* nbCurrentMessage,Message* messages){
