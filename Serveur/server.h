@@ -48,5 +48,7 @@ static void clear_clients(Client *clients, int actual);
 static int search_recipient(const char* buffer,Client * clients, int actual);
 static void send_message_to_specified_client(Client recipient,Client sender, const char* buffer);
 static enum COMMANDS get_command(const char* buffer);
+static char** gc_names(char* buffer);
+static int search_recipient1(const char* buffer,Client*clients, int actual);
 
 #endif /* guard */

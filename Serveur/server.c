@@ -4,7 +4,7 @@
 #include <string.h> 
 #include "server.h"
 #include "client.h"
-
+int num_names =0;
 static void init(void)
 {
 #ifdef WIN32
@@ -152,6 +152,26 @@ static void app(void)
                         printf("Message sent\n");
                      }
                      break;
+                  case GROUP_CHAT:
+                     printf("groupchat\n");
+                     char ** names = gc_names(buffer);
+                     printf("%s\n", buffer);
+                     int m=0;
+                     for(int m =0; m<num_names;m++){
+                        int index_recipient = search_recipient1(names[m],clients,actual);
+                        if (index_recipient==-1)
+                        {
+                           write_client(client.sock, "Destination user not found\n");
+                        }
+                        else{
+
+                           Client* dest = &clients[index_recipient];
+                          // memmove(buffer, buffer + 4 + strlen(dest->name), strlen(buffer));
+                           send_message_to_specified_client(*dest,client,buffer);
+                        }
+                        
+                     }
+                     break;
                   case UNKNOWN:
                      write_client(client.sock, "Unknown command");
                   default:
@@ -271,8 +291,38 @@ static enum COMMANDS get_command(const char* buffer){
       if (buffer[1]=='m')return DIRECT_MESSAGE;
       else if (buffer[1]=='g')return GROUP_CHAT;
       else return UNKNOWN;
-
    }
+   
+}
+
+static char** gc_names(char* buffer){
+   char * token = strtok(buffer, " ");
+   char **names;
+   char **names_final;
+   int i=0; int j=0;
+   while( token != NULL ) {
+      //if(token[0]!='-'){
+         names[j] = token;
+         printf("%s\n", names[j]);
+         token = strtok(NULL, " ");
+         j++;
+      //}
+      i++;
+   }
+   num_names = j-1;
+   int k;
+   
+   printf("%d is number of names in gc\n", num_names);
+   for(k = 0; k < j; k++){
+      char* temp = names[k+1];
+      //if(temp[0] == "-"){
+      //   break;
+      //}
+      names[k]=names[k+1];
+      printf("%s, %d\n", names[k],k);
+   }
+   names[k+1]="\0";
+   return names;
 }
 
 /*Search for recipient in the list of clients*/
@@ -285,6 +335,25 @@ static int search_recipient(const char* buffer,Client*clients, int actual){
       i++;
    }
    name[i - 3] = '\0';
+   /* Find client from name */
+   for (i = 0; i < actual; i++)
+   {
+      if (strcmp(clients[i].name, name) == 0)
+      {
+         return i;
+      }
+   }
+   return -1;
+}
+static int search_recipient1(const char* buffer,Client*clients, int actual){
+   char name[BUF_SIZE];
+   int i = 0;
+   while (buffer[i] && i < BUF_SIZE)
+   {
+      name[i] = buffer[i];
+      i++;
+   }
+   name[i] = '\0';
    /* Find client from name */
    for (i = 0; i < actual; i++)
    {
