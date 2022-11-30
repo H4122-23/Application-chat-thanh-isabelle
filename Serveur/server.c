@@ -322,16 +322,14 @@ static void send_message_to_specified_client(Client recipient, Client sender, co
    strcat(message, ") : ");
    strcat(message, buffer);
    time_t t;
-   struct tm* currentDate;
    time(&t);
-	currentDate = localtime(&t);
+   Message* newMessage = (Message*)malloc(sizeof(Message));
+	newMessage->timestamp = localtime(&t);
    write_client(recipient.sock, message);
    /*Save message history*/
-   Message* newMessage = (Message*)malloc(sizeof(Message));
    strcpy(newMessage->content,buffer);
    newMessage->sender=sender;
    newMessage->recipient=recipient;
-   newMessage->timestamp= currentDate;
    int nbMessages = *nbCurrentMessage;
    messages[nbMessages] = *newMessage;
    nbMessages++;
