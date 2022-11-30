@@ -31,9 +31,11 @@ static void app(void)
    char buffer[BUF_SIZE];
    /* the index for the array */
    int actual = 0;
+   int nbCurrentMessage = 0;
    int max = sock;
    /* an array for all clients */
    Client clients[MAX_CLIENTS];
+   Message messages[MAX_MESSAGES];
 
    fd_set rdfs;
 
@@ -148,12 +150,25 @@ static void app(void)
                         Client* dest = &clients[index_recipient];
                         memmove(buffer, buffer + 4 + strlen(dest->name), strlen(buffer));
                          /* Send the private message */
-                        send_message_to_specified_client(*dest,client,buffer);
+                        send_message_to_specified_client(*dest,client,buffer,&nbCurrentMessage,messages);
                         printf("Message sent\n");
                      }
                      break;
                   case UNKNOWN:
                      write_client(client.sock, "Unknown command");
+                     break;
+                  case SHOW_HISTORY:
+                     printf("Nb messages: %d\n",nbCurrentMessage);
+                     for(int i=0;i<nbCurrentMessage;i++){
+                        Message m = messages[i];
+                        char dateString[30];
+                        strftime(dateString, 30, "%Y-%m-%d", m.timestamp);
+                        printf("Message sent by %s at %s: %s \n",m.sender.name,dateString,m.content);
+                     }
+                     break;
+                  case SAVE_HISTORY:
+                     save_history(messages,nbCurrentMessage);
+                     break;
                   default:
                      break;
                   }
@@ -270,6 +285,8 @@ static enum COMMANDS get_command(const char* buffer){
    if (buffer[0]=='-'){
       if (buffer[1]=='m')return DIRECT_MESSAGE;
       else if (buffer[1]=='g')return GROUP_CHAT;
+      else if (buffer[1]=='h')return SHOW_HISTORY;
+      else if (buffer[1]=='s')return SAVE_HISTORY;
       else return UNKNOWN;
 
    }
@@ -296,14 +313,57 @@ static int search_recipient(const char* buffer,Client*clients, int actual){
    return -1;
 }
 
-static void send_message_to_specified_client(Client recipient, Client sender, const char *buffer){
+static void send_message_to_specified_client(Client recipient, Client sender, const char *buffer,int* nbCurrentMessage,Message* messages){
+   /*Send the message to the recipient*/
    int i = 0;
    char message[BUF_SIZE];
    strcpy(message, "(");
    strcat(message, sender.name);
    strcat(message, ") : ");
    strcat(message, buffer);
+   time_t t;
+   struct tm* currentDate;
+   time(&t);
+	currentDate = localtime(&t);
    write_client(recipient.sock, message);
+   /*Save message history*/
+   Message* newMessage = (Message*)malloc(sizeof(Message));
+   strcpy(newMessage->content,buffer);
+   newMessage->sender=sender;
+   newMessage->recipient=recipient;
+   newMessage->timestamp= currentDate;
+   int nbMessages = *nbCurrentMessage;
+   messages[nbMessages] = *newMessage;
+   nbMessages++;
+   *nbCurrentMessage=nbMessages;
+}
+
+static void save_history(Message* messages,int nbMessages){
+   for(int i=0;i<nbMessages;i++){
+      Message m = messages[i];
+      char filenameIn[MAX_FILENAME];
+      char filenameOut[MAX_FILENAME];
+      strcpy(filenameIn,m.recipient.name);
+      strcat(filenameIn,".txt");
+      strcpy(filenameOut,m.sender.name);
+      strcat(filenameOut,".txt");
+      FILE* fptrIn;
+      FILE* fptrOut;
+      fptrIn = fopen(filenameIn,"a");
+      fptrOut = fopen(filenameOut,"a");
+      if(fptrIn == NULL ||fptrOut ==NULL)
+      {
+         perror("Error when opening files.");   
+         return;             
+      }
+      char timestamp[30];
+      strftime(timestamp, 30, "%x - %I:%M%p", m.timestamp);
+      fprintf(fptrIn,"received from (%s) at %s: %s \n",m.sender.name,timestamp,m.content);
+      fprintf(fptrOut,"sent to (%s) at %s: %s \n",m.recipient.name,timestamp,m.content);
+      fclose(fptrIn);
+      fclose(fptrOut);
+   }
+   
 }
 
 

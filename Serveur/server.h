@@ -30,11 +30,20 @@ typedef struct in_addr IN_ADDR;
 #define CRLF        "\r\n"
 #define PORT         1977
 #define MAX_CLIENTS     100
-
+#define MAX_FILENAME 30
+#define MAX_MESSAGES 1024
 #define BUF_SIZE    1024
 
 #include "client.h"
+#include <time.h>
 
+typedef struct
+{
+   char content[BUF_SIZE];
+   Client sender;
+   Client recipient;
+   struct tm* timestamp;
+} Message;
 static void init(void);
 static void end(void);
 static void app(void);
@@ -46,7 +55,8 @@ static void send_message_to_all_clients(Client *clients, Client client, int actu
 static void remove_client(Client *clients, int to_remove, int *actual);
 static void clear_clients(Client *clients, int actual);
 static int search_recipient(const char* buffer,Client * clients, int actual);
-static void send_message_to_specified_client(Client recipient,Client sender, const char* buffer);
+static void send_message_to_specified_client(Client recipient,Client sender, const char* buffer,int* nbCurrentMessage,Message* messages);
+static void save_history(Message* messages,int nbMessages);
 static enum COMMANDS get_command(const char* buffer);
 
 #endif /* guard */
