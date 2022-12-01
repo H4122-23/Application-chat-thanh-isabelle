@@ -32,6 +32,7 @@ typedef struct in_addr IN_ADDR;
 #define MAX_CLIENTS     100
 
 #define BUF_SIZE    1024
+#define MAX_NAME 10
 
 #include "client.h"
 
@@ -50,5 +51,7 @@ static void send_message_to_specified_client(Client recipient,Client sender, con
 static enum COMMANDS get_command(const char* buffer);
 static char** gc_names(char* buffer);
 static int search_recipient1(const char* buffer,Client*clients, int actual);
+static char* get_group_name(const char* buffer);
+static char** get_group_members(char* buffer);
 
 #endif /* guard */

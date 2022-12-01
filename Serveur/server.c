@@ -153,10 +153,18 @@ static void app(void)
                      }
                      break;
                   case GROUP_CHAT:
+                     // to make a groupchat input -g <name_of_gc> <grouchat members> -
                      printf("groupchat\n");
-                     char ** names = gc_names(buffer);
+                     //char ** names = gc_names(buffer);
+                     
+                     char *gc_name = get_group_name(buffer);
                      printf("%s\n", buffer);
-                     int m=0;
+                     printf("Group name: %s\n", gc_name);
+                     //printf("Size of g name is %ld", sizeof(gc_name));
+                     char** members = get_group_members(buffer);
+                    // printf("out of function\n");
+                     printf("member 1 : %s", members[0]);
+                     /*int m=0;
                      for(int m =0; m<num_names;m++){
                         int index_recipient = search_recipient1(names[m],clients,actual);
                         if (index_recipient==-1)
@@ -170,7 +178,7 @@ static void app(void)
                            send_message_to_specified_client(*dest,client,buffer);
                         }
                         
-                     }
+                     }*/
                      break;
                   case UNKNOWN:
                      write_client(client.sock, "Unknown command");
@@ -186,6 +194,65 @@ static void app(void)
 
    clear_clients(clients, actual);
    end_connection(sock);
+}
+
+static char* get_group_name(const char* buffer){
+   int i = 3;
+   char* name;
+   while (buffer[i] != ' ' && i < BUF_SIZE)
+   {
+      name[i - 3] = buffer[i];
+      i++;
+   }
+   return name;
+}
+
+//function to get members of gc from input 
+
+static char** get_group_members(char* buffer){
+   
+   int i = 3;
+   char** names;
+   char* temp;
+
+   while (buffer[i] != ' ' && i < BUF_SIZE)
+   {
+     // name[i - 3] = buffer[i];
+      i++;
+   }
+   printf("now we are at index of the space after group name in array\n");
+   
+   i++;
+   int j=0; //index of temp 
+   int k=0; //index of names
+   printf("buffer is : %s\n", buffer);
+   while(buffer[i] != '-' && k < 10){
+      //printf("%c\n", buffer[i]);
+     // printf("in while loop at index %d\n", i);
+
+      if(buffer[i]==' '){
+         //next name
+         printf("new name\n");
+         printf("%s\n", temp);
+         
+        // printf("%s\n", names[k]);
+         names[k] = (char*)malloc(j * sizeof(char*));
+         names[k]= temp;
+         printf("names[k] is : %s\n", names[k]);
+         
+         k++;
+         j=0;
+
+      }
+      else{
+         //printf("adding character to temp\n");
+         temp[j]=buffer[i];
+         j++;
+      }
+      i++;
+   }
+   printf("out of loop\n");
+   return names;
 }
 
 static void clear_clients(Client *clients, int actual)
@@ -294,7 +361,7 @@ static enum COMMANDS get_command(const char* buffer){
    }
    
 }
-
+/*
 static char** gc_names(char* buffer){
    char * token = strtok(buffer, " ");
    char **names;
@@ -323,7 +390,7 @@ static char** gc_names(char* buffer){
    }
    names[k+1]="\0";
    return names;
-}
+}*/
 
 /*Search for recipient in the list of clients*/
 static int search_recipient(const char* buffer,Client*clients, int actual){
