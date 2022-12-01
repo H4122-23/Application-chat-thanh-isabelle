@@ -160,10 +160,9 @@ static void app(void)
                      char *gc_name = get_group_name(buffer);
                      printf("%s\n", buffer);
                      printf("Group name: %s\n", gc_name);
-                     //printf("Size of g name is %ld", sizeof(gc_name));
-                     char** members = get_group_members(buffer);
-                    // printf("out of function\n");
-                     printf("member 1 : %s", members[0]);
+                     char* members = get_group_members(buffer);
+                     printf("Groupchat members without creator: %s\n", members);
+                    
                      /*int m=0;
                      for(int m =0; m<num_names;m++){
                         int index_recipient = search_recipient1(names[m],clients,actual);
@@ -196,6 +195,12 @@ static void app(void)
    end_connection(sock);
 }
 
+static Groupchat* create_groupchat(char* name, char* members, Client creator){
+   
+   
+   return new_group;
+}
+
 static char* get_group_name(const char* buffer){
    int i = 3;
    char* name;
@@ -209,49 +214,25 @@ static char* get_group_name(const char* buffer){
 
 //function to get members of gc from input 
 
-static char** get_group_members(char* buffer){
+static char* get_group_members(char* buffer){
    
    int i = 3;
-   char** names;
-   char* temp;
-
+   char* names;
+   
    while (buffer[i] != ' ' && i < BUF_SIZE)
    {
      // name[i - 3] = buffer[i];
       i++;
    }
-   printf("now we are at index of the space after group name in array\n");
    
    i++;
-   int j=0; //index of temp 
-   int k=0; //index of names
-   printf("buffer is : %s\n", buffer);
-   while(buffer[i] != '-' && k < 10){
-      //printf("%c\n", buffer[i]);
-     // printf("in while loop at index %d\n", i);
-
-      if(buffer[i]==' '){
-         //next name
-         printf("new name\n");
-         printf("%s\n", temp);
-         
-        // printf("%s\n", names[k]);
-         names[k] = (char*)malloc(j * sizeof(char*));
-         names[k]= temp;
-         printf("names[k] is : %s\n", names[k]);
-         
-         k++;
-         j=0;
-
-      }
-      else{
-         //printf("adding character to temp\n");
-         temp[j]=buffer[i];
-         j++;
-      }
+   int j=0; //index of names
+   while(buffer[i] != '-' && j < 100){
+      names[j] = buffer[i];
+      j++;
       i++;
    }
-   printf("out of loop\n");
+
    return names;
 }
 
