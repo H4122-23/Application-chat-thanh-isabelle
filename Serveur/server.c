@@ -104,9 +104,10 @@ static void app(void)
             }
          }
          if (duplicated==0){
-           
             clients[actual] = c;
             actual++;
+            /*Load chat history once the client is connected*/
+            load_history(c);
          }else
          {
             closesocket(c.sock);
@@ -157,18 +158,6 @@ static void app(void)
                   case UNKNOWN:
                      write_client(client.sock, "Unknown command");
                      break;
-                  case SHOW_HISTORY:
-                     printf("Nb messages: %d\n",nbCurrentMessage);
-                     for(int i=0;i<nbCurrentMessage;i++){
-                        Message m = messages[i];
-                        char dateString[30];
-                        strftime(dateString, 30, "%Y-%m-%d", m.timestamp);
-                        printf("Message sent by %s at %s: %s \n",m.sender.name,dateString,m.content);
-                     }
-                     break;
-                  /*case SAVE_HISTORY:
-                     save_history(messages,nbCurrentMessage);
-                     break;*/
                   default:
                      break;
                   }
@@ -285,7 +274,6 @@ static enum COMMANDS get_command(const char* buffer){
    if (buffer[0]=='-'){
       if (buffer[1]=='m')return DIRECT_MESSAGE;
       else if (buffer[1]=='g')return GROUP_CHAT;
-      else if (buffer[1]=='h')return SHOW_HISTORY;
       //else if (buffer[1]=='s')return SAVE_HISTORY;
       else return UNKNOWN;
 
@@ -363,8 +351,45 @@ static void save_history(Message* m){
    fprintf(fptrOut,"sent to (%s) at %s: %s \n",m->recipient.name,timestamp,m->content);
    fclose(fptrIn);
    fclose(fptrOut);
+   free(m);
 }
    
+/*Load message history in text file*/
+static void load_history(Client client){
+   FILE* fptr;
+   char *line_buf = NULL;
+   size_t line_buf_size = 0;
+   int line_count = 0;
+   ssize_t line_size;
+   int i =0;
+   char filename[MAX_FILENAME];
+   strcpy(filename,client.name);
+   strcat(filename,".txt");
+   fptr = fopen(filename,"r");
+   if(fptr == NULL)
+   {
+      perror("Error when opening files.");   
+      return;             
+   } 
+   /* Get the first line of the history file. */
+   line_size = getline(&line_buf, &line_buf_size, fptr);
+   /* Loop through until we are done with the file. */
+   while (line_size >= 0)
+   {
+      /* Increment our line count */
+      line_count++;
+      /* Send the line buffer to the client */
+      write_client(client.sock, line_buf);
+      /* Get the next line */
+      line_size = getline(&line_buf, &line_buf_size, fptr);
+  }
+  /* Free the allocated line buffer */
+  free(line_buf);
+
+  /* Close the file now that we are done with it */
+   fclose (fptr);
+   write_client(client.sock,"All history has been loaded.");
+}
 
 
 
