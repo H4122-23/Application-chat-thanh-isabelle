@@ -98,7 +98,7 @@ static void app(void)
          for(int i = 0; i < actual; i++)
          {
             if(strcmp(c.name,clients[i].name)==0){
-               write_client(c.sock, "This pseudoname has been taken. Please choose a new one! ");
+               write_client(c.sock, "This username has been taken. Please choose a new one! ");
                duplicated = 1;
                break;
             }
@@ -130,8 +130,8 @@ static void app(void)
                   closesocket(clients[i].sock);
                   remove_client(clients, i, &actual);
                   strncpy(buffer, client.name, BUF_SIZE - 1);
-                  printf("%s left the server ! \n", client.name);
                   strncat(buffer, " disconnected !", BUF_SIZE - strlen(buffer) - 1);
+                  printf("%s\n", buffer);
                   send_message_to_all_clients(clients, client, actual, buffer, 1);
                }else{
                   /*Get command entered by clients*/
@@ -140,7 +140,7 @@ static void app(void)
                   {
                   case DIRECT_MESSAGE:;
                      /* Find client from recipient's name entered by users*/
-                     char* recipient_name= get_recipient_name(buffer);
+                     char* recipient_name= get_name(buffer);
                      int index_recipient = search_recipient(recipient_name,clients,actual);
                      /* Remove command and name from the buffer */
                      memmove(buffer, buffer + 4 + strlen(recipient_name), strlen(buffer));
@@ -156,6 +156,35 @@ static void app(void)
                      } else{
                         write_client(client.sock, "This person is currently offline.");
                      }
+                     break;
+                  case ONLINE_USERS:;
+                     char online[BUF_SIZE] = "Online - ";
+                     char nbOnline[2]; 
+                     sprintf(nbOnline,"%d",actual);
+                     strcat(online,nbOnline);
+                     strcat(online, ": ");
+                     for(int i=0;i<actual;i++){
+                        strcat(online,clients[i].name);
+                        strcat(online," | ");
+                     }
+                     write_client(client.sock,online);
+                     break;
+                  case CHANGE_USERNAME:;
+                     char* new_username= get_name(buffer);
+                     char oldFilename[MAX_FILENAME];
+                     char newFilename[MAX_FILENAME];
+                     strcpy(oldFilename,client.name);
+                     strcpy(newFilename,new_username);
+                     for(int i=0;i<actual;i++){
+                        if(strcmp(clients[i].name,client.name)==0){
+                           strcpy(clients[i].name,new_username);
+                           break;
+                        }
+                     }
+                     write_client(client.sock, "Your username has been modified.");
+                     strcat(oldFilename,".txt");
+                     strcat(newFilename,".txt");
+                     rename(oldFilename,newFilename);
                      break;
                   case UNKNOWN:
                      write_client(client.sock, "Unknown command");
@@ -284,19 +313,20 @@ static void write_client(SOCKET sock, const char *buffer)
 /*Extract commands entered by users*/
 static enum COMMANDS get_command(const char* buffer){
    if (buffer[0]=='-'){
-      if (buffer[1]=='m')return DIRECT_MESSAGE;
-      else if (buffer[1]=='g')return GROUP_CHAT;
-      //else if (buffer[1]=='s')return SAVE_HISTORY;
+      if (buffer[1]=='m' && buffer[2]==' ')return DIRECT_MESSAGE;
+      else if (buffer[1]=='c' && buffer[2]==' ')return CHANGE_USERNAME;
+      else if (buffer[1]=='o'&&strlen(buffer)==2)return ONLINE_USERS;
+      //else if (buffer[1]=='g')return GROUP_CHAT;
       else return UNKNOWN;
-
    }
+   else return UNKNOWN;
 }
 
-/*Extract recipient's name from the buffer*/
-static char* get_recipient_name(const char* buffer){
-   char* name = (char*)malloc(sizeof(BUF_SIZE));
+/*Extract username from the buffer*/
+static char* get_name(const char* buffer){
+   char* name = (char*)malloc(MAX_FILENAME);
    int i = 3;
-   while (buffer[i] != ' ' && i < BUF_SIZE)
+   while (buffer[i] != ' ' && buffer[i] != '\0' && i < BUF_SIZE)
    {
       name[i - 3] = buffer[i];
       i++;
@@ -397,8 +427,6 @@ static void load_history(Client client){
    fclose (fptr);
    write_client(client.sock,"All history has been loaded.");
 }
-
-
 
 
 int main(int argc, char **argv)
