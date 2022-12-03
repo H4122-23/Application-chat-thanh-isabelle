@@ -57,6 +57,6 @@ static char* get_group_name(const char* buffer);
 static char* get_group_members(char* buffer);
 static Groupchat* create_groupchat( char* members, Client creator, int actual,Client*clients);
 static void send_confirmation_message(Groupchat* gc);
-static int send_message_to_groupchat(Groupchat* groupchat, Client sender, Client *clients, char *buffer);
+static void send_message_to_groupchat(Groupchat* groupchat, Client sender, Client *clients, char *buffer);
 
 #endif /* guard */

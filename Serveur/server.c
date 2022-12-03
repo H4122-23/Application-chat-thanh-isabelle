@@ -155,6 +155,8 @@ static void app(void)
                         printf("Message sent\n");
                      }
                      break;
+
+
                   case GROUP_CHAT:;
                      //check if groupchat exists
                      printf("text in groupchat\n");
@@ -162,20 +164,22 @@ static void app(void)
                      printf("gc name entered is %s\n", gc_name);
                      Groupchat* current_group = (Groupchat*)malloc(sizeof(Groupchat));
                      bool found_gc = false;
-
+                     memmove(buffer, buffer + 4 + strlen(gc_name), strlen(buffer));
                      for( int i = 0; i < gc_index; i++){
                         if(strcmp(gc_name, groupchats[i]->name)==0){
                            found_gc=true;
                            current_group = groupchats[i];
                            printf("group found\n");
-                           
+                           send_message_to_groupchat(current_group, client, clients, buffer);
                            break;
                         }
                      } 
                      if(!found_gc){
                         printf("Groupchat not found\n");
                      }
-                     break;   
+                     break;  
+
+ 
                   case CREATE_GROUP_CHAT:;
                      printf("create groupchat\n");
                      // to make a groupchat input -g <name_of_gc> <grouchat members> 
@@ -222,6 +226,32 @@ static void app(void)
    clear_clients(clients, actual);
    end_connection(sock);
 }
+
+static void send_message_to_groupchat(Groupchat* groupchat, Client sender, Client *clients, char *buffer){
+   char message[BUF_SIZE];
+   printf("%s is buffer\n", buffer);
+   message[0] = 0;
+   for(int i = 0; i < groupchat->size; i++)
+   {
+      /* we don't send message to the sender */
+      if(sender.sock != groupchat->members[i].sock)
+      {  
+         strncpy(message, "( ", sizeof message - strlen(message) - 1);
+         strncat(message, groupchat->name, BUF_SIZE - 1);
+         strncat(message, " ) ", sizeof message - strlen(message) - 1);
+
+         strncat(message, sender.name, BUF_SIZE - 1);
+         strncat(message, " : ", sizeof message - strlen(message) - 1);
+
+
+         strncat(message, buffer, sizeof message - strlen(message) - 1);
+         write_client(groupchat->members[i].sock, message);
+      }
+   }
+}
+
+
+
 
 static void send_confirmation_message(Groupchat* gc){
    char confirmation[BUF_SIZE] = "You just made a groupchat called ";
