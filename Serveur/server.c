@@ -192,14 +192,26 @@ static void app(void)
                      printf("groupchat\n");
                      //char ** names = gc_names(buffer);
                      
-                     char *gc_name = get_group_name(buffer);
+                     // get info from input buffer
+                     char *name_of_gc = get_group_name(buffer);
+                     char namegc[BUF_SIZE];
                      printf("%s\n", buffer);
-                     printf("Group name: %s\n", gc_name);
+                     // change type of name of gc to array of characters instead of pointer
+                     int j=0;
+                     while (*name_of_gc){
+                        namegc[j] = *name_of_gc;
+                        name_of_gc++;
+                        j++;
+                     }
                      char* members = get_group_members(buffer);
                      printf("Groupchat members without creator: %s\n", members);
-                     Groupchat* new_gc = create_groupchat(gc_name, members, client, actual, clients);
-                     //send message to each member of gc saying that they are in the groupchat
-                     
+                     // make new groupchat
+                     Groupchat* new_gc = create_groupchat(members, client, actual, clients);
+                     strcpy(new_gc->name, namegc);
+                     // send confirmation message to creator of gc
+                     send_confirmation_message(new_gc);
+                     printf("done\n");
+                     break;
                   case UNKNOWN:
                      write_client(client.sock, "Unknown command");
                      break;
@@ -217,14 +229,42 @@ static void app(void)
    end_connection(sock);
 }
 
-static Groupchat* create_groupchat(char* name, char* members, Client creator, int actual,Client*clients){
-   Groupchat* new_group = (Groupchat*)malloc(sizeof(Groupchat));
+static void send_confirmation_message(Groupchat* gc){
+   char confirmation[] = "You just made a groupchat called ";
+   strcat(confirmation, gc->name);
+   strcat(confirmation, " with users ");
+   for(int i = 0; i < gc->size; i++){
+      strcat(confirmation,gc->members[i].name);
+      strcat(confirmation, " "); 
+   }
+   printf(" confirmation message: %s\n", confirmation);
+   write_client(gc->members[0].sock, confirmation);
+   
 
+
+   char to_members[] = "Added you to groupchat called ";
+   strcat(to_members, gc->name);
+   strcat(to_members, " with users ");
+   for(int i = 0; i < gc->size; i++){
+      strcat(to_members,gc->members[i].name);
+      strcat(to_members, " "); 
+   }
+   printf("message to members: %s\n", to_members);
+   //send message to each member of gc saying that they are in the groupchat
+   
+   for(int i = 1; i < gc->size; i++){
+      send_message_to_specified_client(gc->members[i],gc->members[0],to_members);
+   }
+   return;
+}
+
+static Groupchat* create_groupchat(char* members, Client creator, int actual,Client*clients){
+   Groupchat* new_group = (Groupchat*)malloc(sizeof(Groupchat));
    char space[] = " ";
    char *ptr = strtok(members, space);
    bool found = false;
    //set group name
-   new_group->name = name;
+   //new_group->name = gc_name;
    new_group->members[0] = creator;
    int mem=1; // index / number of members in groupchat
 	while(ptr != NULL)
@@ -245,13 +285,12 @@ static Groupchat* create_groupchat(char* name, char* members, Client creator, in
       if (!found){
          printf("Client attempting to make groupchat with user not found\n");
          write_client(creator.sock, "User not found");
-         return 0;
+         return NULL;
       }
       found = false;
 		ptr = strtok(NULL, space);
 	}
    new_group->size = mem;
-   
    return new_group;
 }
 
