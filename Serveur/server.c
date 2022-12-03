@@ -37,6 +37,8 @@ static void app(void)
    /* an array for all clients */
    Client clients[MAX_CLIENTS];
    Message messages[MAX_MESSAGES];
+   Groupchat *groupchats[MAX_CLIENTS];
+   int gc_index = 0; // no of groupchats
 
    fd_set rdfs;
 
@@ -187,11 +189,34 @@ static void app(void)
                      strcat(newFilename,".txt");
                      rename(oldFilename,newFilename);
                      break;
-                  case GROUP_CHAT:
+                  case GROUP_CHAT:;
+                     //check if groupchat exists
+                     printf("text in groupchat\n");
+                     char* gc_name= get_group_name(buffer);
+                     printf("gc name entered is %s\n", gc_name);
+                     Groupchat* current_group = (Groupchat*)malloc(sizeof(Groupchat));
+                     bool found_gc = false;
+
+                     for( int i = 0; i < gc_index; i++){
+                        if(strcmp(gc_name, groupchats[i]->name)==0){
+                           found_gc=true;
+                           current_group = groupchats[i];
+                           printf("group found\n");
+                           
+                           break;
+                        }
+                     } 
+                     if(!found_gc){
+                        printf("Groupchat not found\n");
+                     }
+                     break;   
+                  case CREATE_GROUP_CHAT:;
+                     printf("create groupchat\n");
                      // to make a groupchat input -g <name_of_gc> <grouchat members> 
    
                      // get info from input buffer
-                     char *name_of_gc = get_group_name(buffer);
+                     char* name_of_gc= get_group_name(buffer);
+                     printf("name of gc is %s\n", name_of_gc);
                      char namegc[BUF_SIZE];
                      //printf("%s\n", buffer);
                      // change type of name of gc to array of characters instead of pointer
@@ -206,12 +231,14 @@ static void app(void)
                      //printf("Groupchat members without creator: %s\n", members);
                      // make new groupchat
                      Groupchat* new_gc = create_groupchat(members, client, actual, clients);
+                     groupchats[gc_index] = new_gc;
+                     gc_index++;
                      strcpy(new_gc->name, namegc);
                      // send confirmation message to creator of gc
                      send_confirmation_message(new_gc);
-                     printf("Groupchat created\nGroupchat name: %s\nGroupchat creator: %s\nGroupchat members: %s", new_gc->name, new_gc->members[0].name, new_gc->members[0].name);
+                     printf("Groupchat created\nGroupchat name: %s\nGroupchat creator: %s\nGroupchat members: %s\n", new_gc->name, new_gc->members[0].name, new_gc->members[0].name);
                      for(int i = 1; i< new_gc->size; i++){
-                        printf("\n\t\t   %s", new_gc->members[i].name);
+                        printf("\t\t   %s\n", new_gc->members[i].name);
                      }
                      break;
                   case UNKNOWN:
@@ -306,6 +333,7 @@ static char* get_group_name(const char* buffer){
       name[i - 3] = buffer[i];
       i++;
    }
+   name[i-3]="\0";
    return name;
 }
 
@@ -447,6 +475,7 @@ static enum COMMANDS get_command(const char* buffer){
       else if (buffer[1]=='c' && buffer[2]==' ')return CHANGE_USERNAME;
       else if (buffer[1]=='o'&&strlen(buffer)==2)return ONLINE_USERS;
       else if (buffer[1]=='g')return GROUP_CHAT;
+      else if (buffer[1]=='c')return CREATE_GROUP_CHAT;
       else return UNKNOWN;
    }
    
