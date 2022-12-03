@@ -40,8 +40,8 @@ typedef struct in_addr IN_ADDR;
 typedef struct
 {
    char content[BUF_SIZE];
-   Client sender;
-   Client recipient;
+   char sender[MAX_FILENAME];
+   char recipient[MAX_FILENAME];
    struct tm* timestamp;
 } Message;
 static void init(void);
@@ -51,11 +51,13 @@ static int init_connection(void);
 static void end_connection(int sock);
 static int read_client(SOCKET sock, char *buffer);
 static void write_client(SOCKET sock, const char *buffer);
+static Message* create_message(const char* buffer, const char* sender, const char* recipient, int* nbCurrentMessage,Message* messages);
 static void send_message_to_all_clients(Client *clients, Client client, int actual, const char *buffer, char from_server);
 static void remove_client(Client *clients, int to_remove, int *actual);
 static void clear_clients(Client *clients, int actual);
+static char* get_recipient_name(const char* buffer);
 static int search_recipient(const char* buffer,Client * clients, int actual);
-static void send_message_to_specified_client(Client recipient,Client sender, const char* buffer,int* nbCurrentMessage,Message* messages);
+static void send_message_to_specified_client(Client recipient,Client sender, const char* buffer);
 static void save_history(Message* message);
 static void load_history(Client client);
 static enum COMMANDS get_command(const char* buffer);
