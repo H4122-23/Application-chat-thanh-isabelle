@@ -154,14 +154,12 @@ static void app(void)
                      }
                      break;
                   case GROUP_CHAT:
-                     // to make a groupchat input -g <name_of_gc> <grouchat members> -
-                     printf("groupchat\n");
-                     //char ** names = gc_names(buffer);
-                     
+                     // to make a groupchat input -g <name_of_gc> <grouchat members> 
+   
                      // get info from input buffer
                      char *name_of_gc = get_group_name(buffer);
                      char namegc[BUF_SIZE];
-                     printf("%s\n", buffer);
+                     //printf("%s\n", buffer);
                      // change type of name of gc to array of characters instead of pointer
                      int j=0;
                      while (*name_of_gc){
@@ -169,14 +167,18 @@ static void app(void)
                         name_of_gc++;
                         j++;
                      }
+                     name_of_gc[j] = "\0";
                      char* members = get_group_members(buffer);
-                     printf("Groupchat members without creator: %s\n", members);
+                     //printf("Groupchat members without creator: %s\n", members);
                      // make new groupchat
                      Groupchat* new_gc = create_groupchat(members, client, actual, clients);
                      strcpy(new_gc->name, namegc);
                      // send confirmation message to creator of gc
                      send_confirmation_message(new_gc);
-                     printf("done\n");
+                     printf("Groupchat created\nGroupchat name: %s\nGroupchat creator: %s\nGroupchat members: %s", new_gc->name, new_gc->members[0].name, new_gc->members[0].name);
+                     for(int i = 1; i< new_gc->size; i++){
+                        printf("\n\t\t   %s", new_gc->members[i].name);
+                     }
                      break;
                   case UNKNOWN:
                      write_client(client.sock, "Unknown command");
@@ -195,32 +197,32 @@ static void app(void)
 }
 
 static void send_confirmation_message(Groupchat* gc){
-   char confirmation[] = "You just made a groupchat called ";
+   char confirmation[BUF_SIZE] = "You just made a groupchat called ";
    strcat(confirmation, gc->name);
    strcat(confirmation, " with users ");
    for(int i = 0; i < gc->size; i++){
       strcat(confirmation,gc->members[i].name);
       strcat(confirmation, " "); 
    }
-   printf(" confirmation message: %s\n", confirmation);
+   //printf(" confirmation message: %s\n", confirmation);
    write_client(gc->members[0].sock, confirmation);
    
 
 
-   char to_members[] = "Added you to groupchat called ";
+   char to_members[BUF_SIZE] = "Added you to groupchat called ";
    strcat(to_members, gc->name);
    strcat(to_members, " with users ");
    for(int i = 0; i < gc->size; i++){
       strcat(to_members,gc->members[i].name);
       strcat(to_members, " "); 
    }
-   printf("message to members: %s\n", to_members);
+   //printf("message to members: %s\n", to_members);
    //send message to each member of gc saying that they are in the groupchat
    
    for(int i = 1; i < gc->size; i++){
       send_message_to_specified_client(gc->members[i],gc->members[0],to_members);
    }
-   return;
+
 }
 
 static Groupchat* create_groupchat(char* members, Client creator, int actual,Client*clients){
@@ -234,7 +236,7 @@ static Groupchat* create_groupchat(char* members, Client creator, int actual,Cli
    int mem=1; // index / number of members in groupchat
 	while(ptr != NULL)
 	{
-		printf("'%s'\n", ptr);
+		//printf("'%s'\n", ptr);
       /* Find client from name */
       for(int i = 0; i < actual; i++)
       {
