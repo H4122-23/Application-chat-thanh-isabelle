@@ -10,7 +10,7 @@ typedef struct
 }Client;
 typedef struct
 {
-   char name[BUF_SIZE];
+   char* name;
    int size;
    Client members[MAX_NAME];
 }Groupchat;
