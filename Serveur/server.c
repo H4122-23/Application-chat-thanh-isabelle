@@ -171,11 +171,13 @@ static void app(void)
                            current_group = groupchats[i];
                            printf("group found\n");
                            send_message_to_groupchat(current_group, client, clients, buffer);
+                           memset(buffer,0,strlen(buffer));
                            break;
                         }
                      } 
                      if(!found_gc){
                         printf("Groupchat not found\n");
+                        memset(buffer,0,strlen(buffer));
                      }
                      break;  
 
@@ -197,6 +199,7 @@ static void app(void)
                         j++;
                      }
                      name_of_gc[j] = "\0";
+                     memset(name_of_gc,0,strlen(name_of_gc));
                      char* members = get_group_members(buffer);
                      //printf("Groupchat members without creator: %s\n", members);
                      // make new groupchat
@@ -210,9 +213,38 @@ static void app(void)
                      for(int i = 1; i< new_gc->size; i++){
                         printf("\t\t   %s\n", new_gc->members[i].name);
                      }
+                     memset(buffer,0,strlen(buffer));
                      break;
+
+
                   case UNKNOWN:
                      write_client(client.sock, "Unknown command");
+                     break;
+
+
+                  case REMOVE_FROM_GROUP_CHAT:;
+                     // remove member from groupchat
+                     // check if groupchat exists
+                     char* name_ofgc= get_group_name(buffer);
+                     printf("gc name entered is %s\n", name_ofgc);
+                     Groupchat* currentgroup = (Groupchat*)malloc(sizeof(Groupchat));
+                     bool foundgc = false;
+                     for( int i = 0; i < gc_index; i++){
+                        if(strcmp(name_ofgc, groupchats[i]->name)==0){
+                           foundgc=true;
+                           currentgroup = groupchats[i];
+                           printf("group found\n");
+                           //send_message_to_groupchat(current_group, client, clients, buffer);
+                           remove_member(current_group, client);
+                           memset(buffer,0,strlen(buffer));
+                           break;
+                        }
+                     } 
+                     if(!foundgc){
+                        printf("Groupchat not found\n");
+                     }
+                     break;
+
                   default:
                      break;
                   }
@@ -226,6 +258,25 @@ static void app(void)
    clear_clients(clients, actual);
    end_connection(sock);
 }
+
+static void remove_member(Groupchat* gc, Client member){
+   bool found = false;
+   for(int i = 0; i<gc->size; i++){
+      if(strcmp(member.name, gc->members[i].name)==0){
+         found = true;
+         for(int j = i; j<gc->size; j++){
+            gc->members[j]= gc->members[j+1];
+         }
+         gc->size = gc->size-1;
+      }
+   }
+   if(!found){
+      char message[] = "You are not a member of the group you wish to leave\n";
+      write_client(member.sock, message);
+   }
+   printf("Member succesfully removed\n");
+}
+
 
 static void send_message_to_groupchat(Groupchat* groupchat, Client sender, Client *clients, char *buffer){
    char message[BUF_SIZE];
@@ -459,6 +510,7 @@ static enum COMMANDS get_command(const char* buffer){
       if (buffer[1]=='m')return DIRECT_MESSAGE;
       else if (buffer[1]=='g')return GROUP_CHAT;
       else if (buffer[1]=='c')return CREATE_GROUP_CHAT;
+      else if (buffer[1]=='r')return REMOVE_FROM_GROUP_CHAT;
       else return UNKNOWN;
    }
    
