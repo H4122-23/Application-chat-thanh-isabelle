@@ -98,7 +98,7 @@ static void app(void)
          for(int i = 0; i < actual; i++)
          {
             if(strcmp(c.name,clients[i].name)==0){
-               write_client(c.sock, "This pseudoname has been taken. Please choose a new one! ");
+               write_client(c.sock, "This username has been taken. Please choose a new one! ");
                duplicated = 1;
                break;
             }
@@ -130,8 +130,8 @@ static void app(void)
                   closesocket(clients[i].sock);
                   remove_client(clients, i, &actual);
                   strncpy(buffer, client.name, BUF_SIZE - 1);
-                  printf("%s left the server ! \n", client.name);
                   strncat(buffer, " disconnected !", BUF_SIZE - strlen(buffer) - 1);
+                  printf("%s\n", buffer);
                   send_message_to_all_clients(clients, client, actual, buffer, 1);
                }else{
                   /*Get command entered by clients*/
@@ -140,20 +140,51 @@ static void app(void)
                   {
                   case DIRECT_MESSAGE:;
                      /* Find client from recipient's name entered by users*/
-                     int index_recipient = search_recipient(buffer,clients,actual);
-                     if (index_recipient==-1)
-                     {
-                        write_client(client.sock, "Destination user not found");
-                     }
-                     else
-                     {
-                        /* Remove command and name from the buffer */
+                     char* recipient_name= get_name(buffer);
+                     int index_recipient = search_recipient(recipient_name,clients,actual);
+                     /* Remove command and name from the buffer */
+                     memmove(buffer, buffer + 4 + strlen(recipient_name), strlen(buffer));
+                     /*Save message*/
+                     Message* newMessage = create_message(buffer,client.name,recipient_name,&nbCurrentMessage,messages);
+                     save_history(newMessage);
+                     if (index_recipient>-1){
+                        /*If the recipient is online, send the message */
                         Client* dest = &clients[index_recipient];
-                        memmove(buffer, buffer + 4 + strlen(dest->name), strlen(buffer));
                          /* Send the private message */
-                        send_message_to_specified_client(*dest,client,buffer,&nbCurrentMessage,messages);
+                        send_message_to_specified_client(*dest,client,buffer);
                         printf("Message sent\n");
+                     } else{
+                        write_client(client.sock, "This person is currently offline.");
                      }
+                     break;
+                  case ONLINE_USERS:;
+                     char online[BUF_SIZE] = "Online - ";
+                     char nbOnline[2]; 
+                     sprintf(nbOnline,"%d",actual);
+                     strcat(online,nbOnline);
+                     strcat(online, ": ");
+                     for(int i=0;i<actual;i++){
+                        strcat(online,clients[i].name);
+                        strcat(online," | ");
+                     }
+                     write_client(client.sock,online);
+                     break;
+                  case CHANGE_USERNAME:;
+                     char* new_username= get_name(buffer);
+                     char oldFilename[MAX_FILENAME];
+                     char newFilename[MAX_FILENAME];
+                     strcpy(oldFilename,client.name);
+                     strcpy(newFilename,new_username);
+                     for(int i=0;i<actual;i++){
+                        if(strcmp(clients[i].name,client.name)==0){
+                           strcpy(clients[i].name,new_username);
+                           break;
+                        }
+                     }
+                     write_client(client.sock, "Your username has been modified.");
+                     strcat(oldFilename,".txt");
+                     strcat(newFilename,".txt");
+                     rename(oldFilename,newFilename);
                      break;
                   case UNKNOWN:
                      write_client(client.sock, "Unknown command");
@@ -189,6 +220,16 @@ static void remove_client(Client *clients, int to_remove, int *actual)
    (*actual)--;
 }
 
+/*Send the message to one specified recipient - direct message*/
+static void send_message_to_specified_client(Client recipient, Client sender, const char *buffer){
+   char message[BUF_SIZE];
+   strcpy(message, "(");
+   strcat(message, sender.name);
+   strcat(message, ") : ");
+   strcat(message, buffer);
+   write_client(recipient.sock, message);
+}
+/*Send message to all clients in the list*/
 static void send_message_to_all_clients(Client *clients, Client sender, int actual, const char *buffer, char from_server)
 {
    int i = 0;
@@ -272,26 +313,32 @@ static void write_client(SOCKET sock, const char *buffer)
 /*Extract commands entered by users*/
 static enum COMMANDS get_command(const char* buffer){
    if (buffer[0]=='-'){
-      if (buffer[1]=='m')return DIRECT_MESSAGE;
-      else if (buffer[1]=='g')return GROUP_CHAT;
-      //else if (buffer[1]=='s')return SAVE_HISTORY;
+      if (buffer[1]=='m' && buffer[2]==' ')return DIRECT_MESSAGE;
+      else if (buffer[1]=='c' && buffer[2]==' ')return CHANGE_USERNAME;
+      else if (buffer[1]=='o'&&strlen(buffer)==2)return ONLINE_USERS;
+      //else if (buffer[1]=='g')return GROUP_CHAT;
       else return UNKNOWN;
-
    }
+   else return UNKNOWN;
 }
 
-/*Search for recipient in the list of clients*/
-static int search_recipient(const char* buffer,Client*clients, int actual){
-   char name[BUF_SIZE];
+/*Extract username from the buffer*/
+static char* get_name(const char* buffer){
+   char* name = (char*)malloc(MAX_FILENAME);
    int i = 3;
-   while (buffer[i] != ' ' && i < BUF_SIZE)
+   while (buffer[i] != ' ' && buffer[i] != '\0' && i < BUF_SIZE)
    {
       name[i - 3] = buffer[i];
       i++;
    }
    name[i - 3] = '\0';
+   return name;
+}
+
+/*Search for recipient in the list of clients*/
+static int search_recipient(const char* name,Client*clients, int actual){
    /* Find client from name */
-   for (i = 0; i < actual; i++)
+   for (int i = 0; i < actual; i++)
    {
       if (strcmp(clients[i].name, name) == 0)
       {
@@ -301,40 +348,30 @@ static int search_recipient(const char* buffer,Client*clients, int actual){
    return -1;
 }
 
-static void send_message_to_specified_client(Client recipient, Client sender, const char *buffer,int* nbCurrentMessage,Message* messages){
-   /*Send the message to the recipient*/
-   int i = 0;
-   char message[BUF_SIZE];
-   strcpy(message, "(");
-   strcat(message, sender.name);
-   strcat(message, ") : ");
-   strcat(message, buffer);
+/*Create message*/
+static Message* create_message(const char* buffer, const char* sender, const char* recipient, int* nbCurrentMessage,Message* messages){
    time_t t;
    time(&t);
    Message* newMessage = (Message*)malloc(sizeof(Message));
 	newMessage->timestamp = localtime(&t);
-   write_client(recipient.sock, message);
-
    /*Save message history in the array messages*/
    strcpy(newMessage->content,buffer);
-   newMessage->sender=sender;
-   newMessage->recipient=recipient;
+   strcpy(newMessage->sender,sender);
+   strcpy(newMessage->recipient,recipient);
    int nbMessages = *nbCurrentMessage;
    messages[nbMessages] = *newMessage;
    nbMessages++;
    *nbCurrentMessage=nbMessages;
-
-   /*Save message history in the corresponding text files*/
-   save_history(newMessage);
+   return newMessage;
 }
 
 /*Save message history in text files*/
 static void save_history(Message* m){
    char filenameIn[MAX_FILENAME];
    char filenameOut[MAX_FILENAME];
-   strcpy(filenameIn,m->recipient.name);
+   strcpy(filenameIn,m->recipient);
    strcat(filenameIn,".txt");
-   strcpy(filenameOut,m->sender.name);
+   strcpy(filenameOut,m->sender);
    strcat(filenameOut,".txt");
    FILE* fptrIn;
    FILE* fptrOut;
@@ -347,8 +384,8 @@ static void save_history(Message* m){
    }
    char timestamp[30];
    strftime(timestamp, 30, "%x - %I:%M%p", m->timestamp);
-   fprintf(fptrIn,"received from (%s) at %s: %s \n",m->sender.name,timestamp,m->content);
-   fprintf(fptrOut,"sent to (%s) at %s: %s \n",m->recipient.name,timestamp,m->content);
+   fprintf(fptrIn,"received from (%s) at %s: %s \n",m->sender,timestamp,m->content);
+   fprintf(fptrOut,"sent to (%s) at %s: %s \n",m->recipient,timestamp,m->content);
    fclose(fptrIn);
    fclose(fptrOut);
    free(m);
@@ -390,8 +427,6 @@ static void load_history(Client client){
    fclose (fptr);
    write_client(client.sock,"All history has been loaded.");
 }
-
-
 
 
 int main(int argc, char **argv)
