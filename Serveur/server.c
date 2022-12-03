@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <errno.h>
 #include <string.h> 
+#include <stdbool.h>
 #include "server.h"
 #include "client.h"
 int num_names =0;
@@ -196,23 +197,9 @@ static void app(void)
                      printf("Group name: %s\n", gc_name);
                      char* members = get_group_members(buffer);
                      printf("Groupchat members without creator: %s\n", members);
-                    
-                     /*int m=0;
-                     for(int m =0; m<num_names;m++){
-                        int index_recipient = search_recipient1(names[m],clients,actual);
-                        if (index_recipient==-1)
-                        {
-                           write_client(client.sock, "Destination user not found\n");
-                        }
-                        else{
-
-                           Client* dest = &clients[index_recipient];
-                          // memmove(buffer, buffer + 4 + strlen(dest->name), strlen(buffer));
-                           send_message_to_specified_client(*dest,client,buffer);
-                        }
-                        
-                     }*/
-                     break;
+                     Groupchat* new_gc = create_groupchat(gc_name, members, client, actual, clients);
+                     //send message to each member of gc saying that they are in the groupchat
+                     
                   case UNKNOWN:
                      write_client(client.sock, "Unknown command");
                      break;
@@ -230,11 +217,45 @@ static void app(void)
    end_connection(sock);
 }
 
-static Groupchat* create_groupchat(char* name, char* members, Client creator){
-   
+static Groupchat* create_groupchat(char* name, char* members, Client creator, int actual,Client*clients){
+   Groupchat* new_group = (Groupchat*)malloc(sizeof(Groupchat));
+
+   char space[] = " ";
+   char *ptr = strtok(members, space);
+   bool found = false;
+   //set group name
+   new_group->name = name;
+   new_group->members[0] = creator;
+   int mem=1; // index / number of members in groupchat
+	while(ptr != NULL)
+	{
+		printf("'%s'\n", ptr);
+      /* Find client from name */
+      for(int i = 0; i < actual; i++)
+      {
+         if(strcmp(ptr,clients[i].name)==0){
+            found = true;
+            
+           // new_group->members[mem] = malloc(sizeof(Client*));
+            new_group->members[mem] = clients[i];
+            mem++;
+            break;
+         }
+      }
+      if (!found){
+         printf("Client attempting to make groupchat with user not found\n");
+         write_client(creator.sock, "User not found");
+         return 0;
+      }
+      found = false;
+		ptr = strtok(NULL, space);
+	}
+   new_group->size = mem;
    
    return new_group;
 }
+
+
 
 static char* get_group_name(const char* buffer){
    int i = 3;
@@ -389,39 +410,10 @@ static enum COMMANDS get_command(const char* buffer){
    }
    
 }
-/*
-static char** gc_names(char* buffer){
-   char * token = strtok(buffer, " ");
-   char **names;
-   char **names_final;
-   int i=0; int j=0;
-   while( token != NULL ) {
-      //if(token[0]!='-'){
-         names[j] = token;
-         printf("%s\n", names[j]);
-         token = strtok(NULL, " ");
-         j++;
-      //}
-      i++;
-   }
-   num_names = j-1;
-   int k;
-      printf("%d is number of names in gc\n", num_names);
-   for(k = 0; k < j; k++){
-      char* temp = names[k+1];
-      //if(temp[0] == "-"){
-      //   break;
-      //}
-      names[k]=names[k+1];
-      printf("%s, %d\n", names[k],k);
-   }
-   names[k+1]="\0";
-   return names;
-}*/
 
-/*Extract username from the buffer*/
-static char* get_name(const char* buffer){
-   char* name = (char*)malloc(MAX_FILENAME);
+/*Search for recipient in the list of clients*/
+static int search_recipient(const char* buffer,Client*clients, int actual){
+   char name[BUF_SIZE];
    int i = 3;
    while (buffer[i] != ' ' && buffer[i] != '\0' && i < BUF_SIZE)
    {
