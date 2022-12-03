@@ -2,7 +2,7 @@
 #define CLIENT_H
 
 #include "server.h"
-enum COMMANDS{UNKNOWN,DIRECT_MESSAGE,GROUP_CHAT};
+enum COMMANDS{UNKNOWN,DIRECT_MESSAGE,CREATE_GROUP_CHAT,GROUP_CHAT};
 typedef struct
 {
    SOCKET sock;
