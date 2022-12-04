@@ -161,6 +161,7 @@ static void app(void)
                      }
                      break;
                   case ONLINE_USERS:;
+                     /*List all online users*/
                      char online[BUF_SIZE] = "Online - ";
                      char nbOnline[2]; 
                      sprintf(nbOnline,"%d",actual);
@@ -190,7 +191,7 @@ static void app(void)
                      rename(oldFilename,newFilename);
                      break;
                   case GROUP_CHAT:;
-                     /*check if groupchat exists*/
+                     /*Send message to group chat*/
                      char* gc_name= get_name(buffer);
                      Groupchat* current_group = (Groupchat*)malloc(sizeof(Groupchat));
                      bool found_gc = false;
@@ -240,8 +241,43 @@ static void app(void)
                      }
                      memset(buffer,0,strlen(buffer));
                      break;
+                  case ADD_TO_GROUP_CHAT:;
+                     /*Add an user to a groupchat*/
+                     char* name_gc= get_name(buffer);
+                     /* Remove command and group chat from the buffer */
+                     memmove(buffer, buffer + 4 + strlen(name_gc), strlen(buffer));
+                     int id_client = search_user_by_name(buffer,clients,actual);
+                     int i,j;
+                     bool group_found = false;
+                     bool duplicate = false;
+                     if(id_client==-1)write_client(client.sock, "Unable to add this user.");
+                     else{
+                        Client to_be_added = clients[id_client];
+                        for( i = 0; i < gc_index; i++){
+                           if(strcmp(name_gc, groupchats[i]->name)==0){
+                              group_found=true;
+                              for( j=0;j<groupchats[i]->size;j++){
+                                 if(strcmp(groupchats[i]->members[j].name,to_be_added.name)==0){
+                                    write_client(client.sock,"This user is already in the groupchat.");
+                                    duplicate= true;
+                                    break;
+                                 }
+                              }if(!duplicate){
+                                 /*The user is not in the groupchat, he can be added*/
+                                 add_member(groupchats[i],to_be_added);
+                                 char notif[MAX_NOTIFICATION]="You have been added to the groupchat ";
+                                 strcat(notif,groupchats[i]->name);
+                                 strcat(notif, " by ");
+                                 strcat(notif,client.name);
+                                 write_client(to_be_added.sock,notif);
+                              }
+                              break;
+                           }
+                        }if(!group_found) write_client(client.sock, "You are not a member of this groupchat."); 
+                     }
+                     break;
                   case QUIT_GROUP_CHAT:;
-                     /* check if groupchat exists*/
+                     /*Quit a groupchat*/
                      char* name_ofgc= get_name(buffer);
                      bool foundgc = false;
                      for( int i = 0; i < gc_index; i++){
@@ -258,7 +294,7 @@ static void app(void)
                      }
                      break;
                   case REMOVE_FROM_GROUP_CHAT:;
-                     /* check if groupchat exists*/
+                     /*Remove an user from a groupchat*/
                      char* group_name= get_name(buffer);
                      /* Remove command and group chat from the buffer */
                      memmove(buffer, buffer + 4 + strlen(group_name), strlen(buffer));
@@ -385,10 +421,11 @@ static enum COMMANDS get_command(const char* buffer){
       if (buffer[1]=='m' && buffer[2]==' ')return DIRECT_MESSAGE;
       else if (buffer[1]=='u' && buffer[2]==' ')return CHANGE_USERNAME;
       else if (buffer[1]=='o'&&strlen(buffer)==2)return ONLINE_USERS;
-      else if (buffer[1]=='g')return GROUP_CHAT;
-      else if (buffer[1]=='c')return CREATE_GROUP_CHAT;
-      else if (buffer[1]=='q')return QUIT_GROUP_CHAT;
-      else if (buffer[1]=='r')return REMOVE_FROM_GROUP_CHAT;
+      else if (buffer[1]=='g'&& buffer[2]==' ')return GROUP_CHAT;
+      else if (buffer[1]=='c'&& buffer[2]==' ')return CREATE_GROUP_CHAT;
+      else if(buffer[1]=='a'&& buffer[2]==' ')return ADD_TO_GROUP_CHAT;
+      else if (buffer[1]=='q'&& buffer[2]==' ')return QUIT_GROUP_CHAT;
+      else if (buffer[1]=='r'&& buffer[2]==' ')return REMOVE_FROM_GROUP_CHAT;
       else return UNKNOWN;
    }
    
@@ -440,6 +477,13 @@ static Groupchat* create_groupchat(char* members, Client creator, int actual,Cli
 	}
    new_group->size = mem;
    return new_group;
+}
+
+/*Add a member to group chat*/
+static void add_member(Groupchat* gc, Client member){
+   gc->members[gc->size]=member;
+   gc->size++;
+   printf("Member succesfully added\n");
 }
 
 /*Remove a member of group chat*/

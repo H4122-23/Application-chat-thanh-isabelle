@@ -48,6 +48,14 @@ typedef struct
    char recipient[MAX_FILENAME];
    struct tm* timestamp;
 } Message;
+
+typedef struct
+{
+   char name[BUF_SIZE];
+   int size;
+   Client members[MAX_NAME];
+}Groupchat;
+
 static void init(void);
 static void end(void);
 static void app(void);
@@ -69,6 +77,7 @@ static void send_message_to_groupchat(Groupchat* groupchat, Client sender, Clien
 static void save_history(Message* message);
 static void save_history_groupchat(Message* message,Groupchat* gc);
 static void load_history(Client client);
+static void add_member(Groupchat* gc, Client member);
 static void remove_member(Groupchat* gc, Client member);
 
 #endif /* guard */
