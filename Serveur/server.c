@@ -199,13 +199,16 @@ static void app(void)
                      for( int i = 0; i < gc_index; i++){
                         /*Search for the groupchat of name gc_name*/
                         if(strcmp(gc_name, groupchats[i]->name)==0){
+                           current_group = groupchats[i];
                            int nbMembers = groupchats[i]->size;
                            for(int j =0;j<nbMembers;j++){
                               if(strcmp(groupchats[i]->members[j].name,client.name)==0){
-                                 /*The client is currently in the groupchat*/
+                                 /*If the client is currently in the groupchat, send message*/
                                  found_gc=true;
-                                 current_group = groupchats[i];
                                  send_message_to_groupchat(current_group, client, clients, buffer);
+                                 /*Save message*/
+                                 Message* messageToGroup = create_message(buffer,client.name,gc_name,&nbCurrentMessage,messages);
+                                 save_history_groupchat(messageToGroup,current_group);
                                  break;
                               }
                            }
@@ -466,7 +469,6 @@ static void send_message_to_all_clients(Client *clients, Client sender, int actu
 /*Send message to all members of groupchat*/
 static void send_message_to_groupchat(Groupchat* groupchat, Client sender, Client *clients, char *buffer){
    char message[BUF_SIZE];
-   printf("%s is buffer\n", buffer);
    message[0] = 0;
    for(int i = 0; i < groupchat->size; i++)
    {
@@ -523,7 +525,6 @@ static int search_recipient(const char* name,Client*clients, int actual){
    return -1;
 }
 
-
 /*Create message*/
 static Message* create_message(const char* buffer, const char* sender, const char* recipient, int* nbCurrentMessage,Message* messages){
    time_t t;
@@ -563,6 +564,41 @@ static void save_history(Message* m){
    fprintf(fptrIn,"received from (%s) at %s: %s \n",m->sender,timestamp,m->content);
    fprintf(fptrOut,"sent to (%s) at %s: %s \n",m->recipient,timestamp,m->content);
    fclose(fptrIn);
+   fclose(fptrOut);
+   free(m);
+}
+/*Save message history in text files*/
+static void save_history_groupchat(Message* m,Groupchat* gc){
+   char filenameIn[MAX_FILENAME];
+   char filenameOut[MAX_FILENAME];
+   strcpy(filenameOut,m->sender);
+   strcat(filenameOut,".txt");
+   FILE* fptrIn;
+   FILE* fptrOut;
+   fptrOut = fopen(filenameOut,"a");
+   char timestamp[30];
+   strftime(timestamp, 30, "%x - %I:%M%p", m->timestamp);
+   if(fptrOut ==NULL)
+   {
+      perror("Error when opening files.");   
+      return;             
+   }
+   int nbMembers = gc->size;
+   for (int i=0;i<nbMembers;i++){
+      if(strcmp(gc->members[i].name,m->sender)!=0){
+         strcpy(filenameIn,gc->members[i].name);
+         strcat(filenameIn,".txt");
+         fptrIn = fopen(filenameIn,"a");
+         if(fptrIn ==NULL)
+         {
+            perror("Error when opening files.");   
+            return;             
+         }
+         fprintf(fptrIn,"received from groupchat (%s) - %s at %s: %s \n",m->recipient,m->sender,timestamp,m->content);
+         fclose(fptrIn);
+      }
+   }
+   fprintf(fptrOut,"sent to (%s) at %s: %s \n",m->recipient,timestamp,m->content);
    fclose(fptrOut);
    free(m);
 }
