@@ -190,39 +190,39 @@ static void app(void)
                      rename(oldFilename,newFilename);
                      break;
                   case GROUP_CHAT:;
-                     //check if groupchat exists
-                     printf("text in groupchat\n");
+                     /*check if groupchat exists*/
                      char* gc_name= get_name(buffer);
-                     printf("gc name entered is %s\n", gc_name);
                      Groupchat* current_group = (Groupchat*)malloc(sizeof(Groupchat));
                      bool found_gc = false;
+                     /* Remove command and group chat from the buffer */
                      memmove(buffer, buffer + 4 + strlen(gc_name), strlen(buffer));
                      for( int i = 0; i < gc_index; i++){
+                        /*Search for the groupchat of name gc_name*/
                         if(strcmp(gc_name, groupchats[i]->name)==0){
-                           found_gc=true;
-                           current_group = groupchats[i];
-                           printf("group found\n");
-                           send_message_to_groupchat(current_group, client, clients, buffer);
-                           memset(buffer,0,strlen(buffer));
+                           int nbMembers = groupchats[i]->size;
+                           for(int j =0;j<nbMembers;j++){
+                              if(strcmp(groupchats[i]->members[j].name,client.name)==0){
+                                 /*The client is currently in the groupchat*/
+                                 found_gc=true;
+                                 current_group = groupchats[i];
+                                 send_message_to_groupchat(current_group, client, clients, buffer);
+                                 break;
+                              }
+                           }
                            break;
                         }
-                     } 
-                     if(!found_gc){
-                        printf("Groupchat not found\n");
-                        memset(buffer,0,strlen(buffer));
                      }
+                     if(!found_gc){
+                        write_client(client.sock, "You are not a member of this groupchat.");
+                     } 
+                     memset(buffer,0,strlen(buffer));
                      break;  
                   case CREATE_GROUP_CHAT:;
-                     printf("create groupchat\n");
-                     // to make a groupchat input -g <name_of_gc> <grouchat members> 
-   
-                     // get info from input buffer
+                     /*to make a groupchat input -g <name_of_gc> <grouchat members> */
                      char* name_of_gc= get_name(buffer);
-                     printf("name of gc is %s\n", name_of_gc);
-                     char* members = get_group_members(buffer);
-                     //printf("Groupchat members without creator: %s\n", members);
-                     // make new groupchat
-                     Groupchat* new_gc = create_groupchat(members, client, actual, clients,name_of_gc);
+                     /* Remove command and group chat from the buffer */
+                     memmove(buffer, buffer + 4 + strlen(name_of_gc), strlen(buffer));
+                     Groupchat* new_gc = create_groupchat(buffer, client, actual, clients,name_of_gc);
                      groupchats[gc_index] = new_gc;
                      gc_index++;
                      // send confirmation message to creator of gc
@@ -377,26 +377,6 @@ static char* get_name(const char* buffer){
    return name;
 }
 
-//function to get members of gc from input 
-
-static char* get_group_members(char* buffer){
-   int i = 3;
-   char* names = (char*)malloc(MAX_CLIENTS);
-   while (buffer[i] != ' ' && i < BUF_SIZE)
-   {
-     // name[i - 3] = buffer[i];
-      i++;
-   }
-   i++;
-   int j=0; //index of names
-   while(buffer[i] != '-' && j < 100){
-      names[j] = buffer[i];
-      j++;
-      i++;
-   }
-   return names;
-}
-
 static Groupchat* create_groupchat(char* members, Client creator, int actual,Client*clients,const char* name){
    Groupchat* new_group = (Groupchat*)malloc(sizeof(Groupchat));
    strcpy(new_group->name,name);
@@ -404,7 +384,6 @@ static Groupchat* create_groupchat(char* members, Client creator, int actual,Cli
    char *ptr = strtok(members, space);
    bool found = false;
    //set group name
-   //new_group->name = gc_name;
    new_group->members[0] = creator;
    int mem=1; // index / number of members in groupchat
 	while(ptr != NULL)

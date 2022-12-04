@@ -64,8 +64,6 @@ static void send_message_to_specified_client(Client recipient,Client sender, con
 static void save_history(Message* message);
 static void load_history(Client client);
 static enum COMMANDS get_command(const char* buffer);
-static char** gc_names(char* buffer);
-static char* get_group_members(char* buffer);
 static Groupchat* create_groupchat( char* members, Client creator, int actual,Client*clients,const char* name);
 static void send_confirmation_message(Groupchat* gc);
 static void send_message_to_groupchat(Groupchat* groupchat, Client sender, Client *clients, char *buffer);
