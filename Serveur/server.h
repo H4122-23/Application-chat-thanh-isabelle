@@ -36,6 +36,7 @@ typedef struct in_addr IN_ADDR;
 #define MAX_MESSAGES 1024
 #define BUF_SIZE    1024
 #define MAX_NAME 10
+#define MAX_NOTIFICATION 50
 
 #include "client.h"
 #include <time.h>
@@ -61,7 +62,7 @@ static char* get_name(const char* buffer);
 static Message* create_message(const char* buffer, const char* sender, const char* recipient, int* nbCurrentMessage,Message* messages);
 static Groupchat* create_groupchat( char* members, Client creator, int actual,Client*clients,const char* name);
 static void send_message_to_all_clients(Client *clients, Client client, int actual, const char *buffer, char from_server);
-static int search_recipient(const char* buffer,Client * clients, int actual);
+static int search_user_by_name(const char* buffer,Client * clients, int actual);
 static void send_message_to_specified_client(Client recipient,Client sender, const char* buffer);
 static void send_confirmation_message(Groupchat* gc);
 static void send_message_to_groupchat(Groupchat* groupchat, Client sender, Client *clients, char *buffer);
