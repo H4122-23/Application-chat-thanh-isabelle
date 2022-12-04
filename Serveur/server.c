@@ -2,9 +2,10 @@
 #include <stdlib.h>
 #include <errno.h>
 #include <string.h> 
+#include <stdbool.h>
 #include "server.h"
 #include "client.h"
-
+int num_names =0;
 static void init(void)
 {
 #ifdef WIN32
@@ -36,6 +37,8 @@ static void app(void)
    /* an array for all clients */
    Client clients[MAX_CLIENTS];
    Message messages[MAX_MESSAGES];
+   Groupchat *groupchats[MAX_CLIENTS];
+   int gc_index = 0; // no of groupchats
 
    fd_set rdfs;
 
@@ -141,7 +144,7 @@ static void app(void)
                   case DIRECT_MESSAGE:;
                      /* Find client from recipient's name entered by users*/
                      char* recipient_name= get_name(buffer);
-                     int index_recipient = search_recipient(recipient_name,clients,actual);
+                     int index_recipient = search_user_by_name(recipient_name,clients,actual);
                      /* Remove command and name from the buffer */
                      memmove(buffer, buffer + 4 + strlen(recipient_name), strlen(buffer));
                      /*Save message*/
@@ -158,6 +161,7 @@ static void app(void)
                      }
                      break;
                   case ONLINE_USERS:;
+                     /*List all online users*/
                      char online[BUF_SIZE] = "Online - ";
                      char nbOnline[2]; 
                      sprintf(nbOnline,"%d",actual);
@@ -186,6 +190,137 @@ static void app(void)
                      strcat(newFilename,".txt");
                      rename(oldFilename,newFilename);
                      break;
+                  case GROUP_CHAT:;
+                     /*Send message to group chat*/
+                     char* gc_name= get_name(buffer);
+                     Groupchat* current_group = (Groupchat*)malloc(sizeof(Groupchat));
+                     bool found_gc = false;
+                     /* Remove command and group chat from the buffer */
+                     memmove(buffer, buffer + 4 + strlen(gc_name), strlen(buffer));
+                     for( int i = 0; i < gc_index; i++){
+                        /*Search for the groupchat of name gc_name*/
+                        if(strcmp(gc_name, groupchats[i]->name)==0){
+                           current_group = groupchats[i];
+                           int nbMembers = groupchats[i]->size;
+                           for(int j =0;j<nbMembers;j++){
+                              if(strcmp(groupchats[i]->members[j].name,client.name)==0){
+                                 /*If the client is currently in the groupchat, send message*/
+                                 found_gc=true;
+                                 send_message_to_groupchat(current_group, client, clients, buffer);
+                                 /*Save message*/
+                                 Message* messageToGroup = create_message(buffer,client.name,gc_name,&nbCurrentMessage,messages);
+                                 save_history_groupchat(messageToGroup,current_group);
+                                 break;
+                              }
+                           }
+                           break;
+                        }
+                     }
+                     if(!found_gc){
+                        write_client(client.sock, "You are not a member of this groupchat.");
+                     } 
+                     memset(buffer,0,strlen(buffer));
+                     break;  
+                  case CREATE_GROUP_CHAT:;
+                     /*to make a groupchat input -g <name_of_gc> <grouchat members> */
+                     char* name_of_gc= get_name(buffer);
+                     /* Remove command and group chat from the buffer */
+                     memmove(buffer, buffer + 4 + strlen(name_of_gc), strlen(buffer));
+                     Groupchat* new_gc = create_groupchat(buffer, client, actual, clients,name_of_gc);
+                     if(new_gc!=NULL){
+                        groupchats[gc_index] = new_gc;
+                        gc_index++;
+                        // send confirmation message to creator of gc
+                        send_confirmation_message(new_gc);
+                        printf("Groupchat created\nGroupchat name: %s\nGroupchat creator: %s\nGroupchat members: %s\n", new_gc->name, new_gc->members[0].name, new_gc->members[0].name);
+                        for(int i = 1; i< new_gc->size; i++){
+                           printf("\t\t   %s\n", new_gc->members[i].name);
+                        }
+                     } else{
+                        write_client(client.sock,"Unable to create a groupchat with these users.");
+                     }
+                     memset(buffer,0,strlen(buffer));
+                     break;
+                  case ADD_TO_GROUP_CHAT:;
+                     /*Add an user to a groupchat*/
+                     char* name_gc= get_name(buffer);
+                     /* Remove command and group chat from the buffer */
+                     memmove(buffer, buffer + 4 + strlen(name_gc), strlen(buffer));
+                     int id_client = search_user_by_name(buffer,clients,actual);
+                     int i,j;
+                     bool group_found = false;
+                     bool duplicate = false;
+                     if(id_client==-1)write_client(client.sock, "Unable to add this user.");
+                     else{
+                        Client to_be_added = clients[id_client];
+                        for( i = 0; i < gc_index; i++){
+                           if(strcmp(name_gc, groupchats[i]->name)==0){
+                              group_found=true;
+                              for( j=0;j<groupchats[i]->size;j++){
+                                 if(strcmp(groupchats[i]->members[j].name,to_be_added.name)==0){
+                                    write_client(client.sock,"This user is already in the groupchat.");
+                                    duplicate= true;
+                                    break;
+                                 }
+                              }if(!duplicate){
+                                 /*The user is not in the groupchat, he can be added*/
+                                 add_member(groupchats[i],to_be_added);
+                                 char notif[MAX_NOTIFICATION]="You have been added to the groupchat ";
+                                 strcat(notif,groupchats[i]->name);
+                                 strcat(notif, " by ");
+                                 strcat(notif,client.name);
+                                 write_client(to_be_added.sock,notif);
+                              }
+                              break;
+                           }
+                        }if(!group_found) write_client(client.sock, "You are not a member of this groupchat."); 
+                     }
+                     break;
+                  case QUIT_GROUP_CHAT:;
+                     /*Quit a groupchat*/
+                     char* name_ofgc= get_name(buffer);
+                     bool foundgc = false;
+                     for( int i = 0; i < gc_index; i++){
+                        if(strcmp(name_ofgc, groupchats[i]->name)==0){
+                           foundgc=true;
+                           remove_member(groupchats[i],client);
+                           char noti[MAX_NOTIFICATION]="You left the groupchat ";
+                           strcat(noti,groupchats[i]->name);
+                           write_client(client.sock,noti);
+                        }
+                     } 
+                     if(!foundgc){
+                        write_client(client.sock, "You are not a member of this groupchat.");
+                     }
+                     break;
+                  case REMOVE_FROM_GROUP_CHAT:;
+                     /*Remove an user from a groupchat*/
+                     char* group_name= get_name(buffer);
+                     /* Remove command and group chat from the buffer */
+                     memmove(buffer, buffer + 4 + strlen(group_name), strlen(buffer));
+                     int index_client = search_user_by_name(buffer,clients,actual);
+                     bool gc_found = false;
+                     if(index_client>-1){
+                        Client to_be_removed = clients[index_client];
+                        for( int i = 0; i < gc_index; i++){
+                           if(strcmp(group_name, groupchats[i]->name)==0){
+                              gc_found=true;
+                              for(int j=0;j<groupchats[i]->size;j++){
+                                 if(strcmp(groupchats[i]->members[j].name,to_be_removed.name)==0){
+                                    /*check if the user to be removed belongs to the groupchat*/
+                                    remove_member(groupchats[i],to_be_removed);
+                                    char message[MAX_NOTIFICATION]="You have been removed from the groupchat ";
+                                    strcat(message,groupchats[i]->name);
+                                    write_client(to_be_removed.sock,message);
+                                 }
+                              }
+                           }
+                        } 
+                     }
+                     if(!gc_found){
+                        write_client(client.sock, "You are not a member of this groupchat.");
+                     }
+                     break;
                   case UNKNOWN:
                      write_client(client.sock, "Unknown command");
                      break;
@@ -198,59 +333,12 @@ static void app(void)
          }
       }
    }
-
    clear_clients(clients, actual);
    end_connection(sock);
+
 }
 
-static void clear_clients(Client *clients, int actual)
-{
-   int i = 0;
-   for(i = 0; i < actual; i++)
-   {
-      closesocket(clients[i].sock);
-   }
-}
-
-static void remove_client(Client *clients, int to_remove, int *actual)
-{
-   /* we remove the client in the array */
-   memmove(clients + to_remove, clients + to_remove + 1, (*actual - to_remove - 1) * sizeof(Client));
-   /* number client - 1 */
-   (*actual)--;
-}
-
-/*Send the message to one specified recipient - direct message*/
-static void send_message_to_specified_client(Client recipient, Client sender, const char *buffer){
-   char message[BUF_SIZE];
-   strcpy(message, "(");
-   strcat(message, sender.name);
-   strcat(message, ") : ");
-   strcat(message, buffer);
-   write_client(recipient.sock, message);
-}
-/*Send message to all clients in the list*/
-static void send_message_to_all_clients(Client *clients, Client sender, int actual, const char *buffer, char from_server)
-{
-   int i = 0;
-   char message[BUF_SIZE];
-   message[0] = 0;
-   for(i = 0; i < actual; i++)
-   {
-      /* we don't send message to the sender */
-      if(sender.sock != clients[i].sock)
-      {
-         if(from_server == 0)
-         {
-            strncpy(message, sender.name, BUF_SIZE - 1);
-            strncat(message, " : ", sizeof message - strlen(message) - 1);
-         }
-         strncat(message, buffer, sizeof message - strlen(message) - 1);
-         write_client(clients[i].sock, message);
-      }
-   }
-}
-
+/*Initialize the connection*/
 static int init_connection(void)
 {
    SOCKET sock = socket(AF_INET, SOCK_STREAM, 0);
@@ -310,16 +398,37 @@ static void write_client(SOCKET sock, const char *buffer)
    }
 }
 
+static void clear_clients(Client *clients, int actual)
+{
+   int i = 0;
+   for(i = 0; i < actual; i++)
+   {
+      closesocket(clients[i].sock);
+   }
+}
+
+static void remove_client(Client *clients, int to_remove, int *actual)
+{
+   /* we remove the client in the array */
+   memmove(clients + to_remove, clients + to_remove + 1, (*actual - to_remove - 1) * sizeof(Client));
+   /* number client - 1 */
+   (*actual)--;
+}
+
 /*Extract commands entered by users*/
 static enum COMMANDS get_command(const char* buffer){
    if (buffer[0]=='-'){
       if (buffer[1]=='m' && buffer[2]==' ')return DIRECT_MESSAGE;
-      else if (buffer[1]=='c' && buffer[2]==' ')return CHANGE_USERNAME;
+      else if (buffer[1]=='u' && buffer[2]==' ')return CHANGE_USERNAME;
       else if (buffer[1]=='o'&&strlen(buffer)==2)return ONLINE_USERS;
-      //else if (buffer[1]=='g')return GROUP_CHAT;
+      else if (buffer[1]=='g'&& buffer[2]==' ')return GROUP_CHAT;
+      else if (buffer[1]=='c'&& buffer[2]==' ')return CREATE_GROUP_CHAT;
+      else if(buffer[1]=='a'&& buffer[2]==' ')return ADD_TO_GROUP_CHAT;
+      else if (buffer[1]=='q'&& buffer[2]==' ')return QUIT_GROUP_CHAT;
+      else if (buffer[1]=='r'&& buffer[2]==' ')return REMOVE_FROM_GROUP_CHAT;
       else return UNKNOWN;
    }
-   else return UNKNOWN;
+   
 }
 
 /*Extract username from the buffer*/
@@ -335,8 +444,140 @@ static char* get_name(const char* buffer){
    return name;
 }
 
+static Groupchat* create_groupchat(char* members, Client creator, int actual,Client*clients,const char* name){
+   Groupchat* new_group = (Groupchat*)malloc(sizeof(Groupchat));
+   strcpy(new_group->name,name);
+   char space[] = " ";
+   char *ptr = strtok(members, space);
+   bool found = false;
+   //set group name
+   new_group->members[0] = creator;
+   int mem=1; // index / number of members in groupchat
+	while(ptr != NULL)
+	{
+		//printf("'%s'\n", ptr);
+      /* Find client from name */
+      for(int i = 0; i < actual; i++)
+      {
+         if(strcmp(ptr,clients[i].name)==0){
+            found = true;
+            
+           // new_group->members[mem] = malloc(sizeof(Client*));
+            new_group->members[mem] = clients[i];
+            mem++;
+            break;
+         }
+      }
+      if (!found){
+         printf("Client attempting to make groupchat with user not found\n");
+         return NULL;
+      }
+      found = false;
+		ptr = strtok(NULL, space);
+	}
+   new_group->size = mem;
+   return new_group;
+}
+
+/*Add a member to group chat*/
+static void add_member(Groupchat* gc, Client member){
+   gc->members[gc->size]=member;
+   gc->size++;
+   printf("Member succesfully added\n");
+}
+
+/*Remove a member of group chat*/
+static void remove_member(Groupchat* gc, Client member){
+   for(int i = 0; i<gc->size; i++){
+      if(strcmp(member.name, gc->members[i].name)==0){
+         gc->size = gc->size-1;
+         for(int j = i; j<gc->size; j++){
+            gc->members[j]= gc->members[j+1];
+         }
+      }
+   }
+   printf("Member succesfully removed\n");
+}
+
+/*Send the message to one specified recipient - direct message*/
+static void send_message_to_specified_client(Client recipient, Client sender, const char *buffer){
+   char message[BUF_SIZE];
+   strcpy(message, "(");
+   strcat(message, sender.name);
+   strcat(message, ") : ");
+   strcat(message, buffer);
+   write_client(recipient.sock, message);
+}
+/*Send message to all clients in the list*/
+static void send_message_to_all_clients(Client *clients, Client sender, int actual, const char *buffer, char from_server)
+{
+   int i = 0;
+   char message[BUF_SIZE];
+   message[0] = 0;
+   for(i = 0; i < actual; i++)
+   {
+      /* we don't send message to the sender */
+      if(sender.sock != clients[i].sock)
+      {
+         if(from_server == 0)
+         {
+            strncpy(message, sender.name, BUF_SIZE - 1);
+            strncat(message, " : ", sizeof message - strlen(message) - 1);
+         }
+         strncat(message, buffer, sizeof message - strlen(message) - 1);
+         write_client(clients[i].sock, message);
+      }
+   }
+}
+
+/*Send message to all members of groupchat*/
+static void send_message_to_groupchat(Groupchat* groupchat, Client sender, Client *clients, char *buffer){
+   char message[BUF_SIZE];
+   message[0] = 0;
+   for(int i = 0; i < groupchat->size; i++)
+   {
+      /* we don't send message to the sender */
+      if(sender.sock != groupchat->members[i].sock)
+      {  
+         strncpy(message, "( ", sizeof message - strlen(message) - 1);
+         strncat(message, groupchat->name, BUF_SIZE - 1);
+         strncat(message, " ) ", sizeof message - strlen(message) - 1);
+         strncat(message, sender.name, BUF_SIZE - 1);
+         strncat(message, " : ", sizeof message - strlen(message) - 1);
+         strncat(message, buffer, sizeof message - strlen(message) - 1);
+         write_client(groupchat->members[i].sock, message);
+      }
+   }
+}
+
+/*Send confirmation message after creating groupchat*/
+static void send_confirmation_message(Groupchat* gc){
+   char confirmation[BUF_SIZE] = "You just made a groupchat called ";
+   strcat(confirmation, gc->name);
+   strcat(confirmation, " with users ");
+   for(int i = 0; i < gc->size; i++){
+      strcat(confirmation,gc->members[i].name);
+      strcat(confirmation, " "); 
+   }
+   //printf(" confirmation message: %s\n", confirmation);
+   write_client(gc->members[0].sock, confirmation);
+   char to_members[BUF_SIZE] = "Added you to groupchat called ";
+   strcat(to_members, gc->name);
+   strcat(to_members, " with users ");
+   for(int i = 0; i < gc->size; i++){
+      strcat(to_members,gc->members[i].name);
+      strcat(to_members, " "); 
+   }
+   //printf("message to members: %s\n", to_members);
+   //send message to each member of gc saying that they are in the groupchat
+   
+   for(int i = 1; i < gc->size; i++){
+      send_message_to_specified_client(gc->members[i],gc->members[0],to_members);
+   }
+}
+
 /*Search for recipient in the list of clients*/
-static int search_recipient(const char* name,Client*clients, int actual){
+static int search_user_by_name(const char* name,Client*clients, int actual){
    /* Find client from name */
    for (int i = 0; i < actual; i++)
    {
@@ -387,6 +628,41 @@ static void save_history(Message* m){
    fprintf(fptrIn,"received from (%s) at %s: %s \n",m->sender,timestamp,m->content);
    fprintf(fptrOut,"sent to (%s) at %s: %s \n",m->recipient,timestamp,m->content);
    fclose(fptrIn);
+   fclose(fptrOut);
+   free(m);
+}
+/*Save message history in text files*/
+static void save_history_groupchat(Message* m,Groupchat* gc){
+   char filenameIn[MAX_FILENAME];
+   char filenameOut[MAX_FILENAME];
+   strcpy(filenameOut,m->sender);
+   strcat(filenameOut,".txt");
+   FILE* fptrIn;
+   FILE* fptrOut;
+   fptrOut = fopen(filenameOut,"a");
+   char timestamp[30];
+   strftime(timestamp, 30, "%x - %I:%M%p", m->timestamp);
+   if(fptrOut ==NULL)
+   {
+      perror("Error when opening files.");   
+      return;             
+   }
+   int nbMembers = gc->size;
+   for (int i=0;i<nbMembers;i++){
+      if(strcmp(gc->members[i].name,m->sender)!=0){
+         strcpy(filenameIn,gc->members[i].name);
+         strcat(filenameIn,".txt");
+         fptrIn = fopen(filenameIn,"a");
+         if(fptrIn ==NULL)
+         {
+            perror("Error when opening files.");   
+            return;             
+         }
+         fprintf(fptrIn,"received from groupchat (%s) - %s at %s: %s \n",m->recipient,m->sender,timestamp,m->content);
+         fclose(fptrIn);
+      }
+   }
+   fprintf(fptrOut,"sent to (%s) at %s: %s \n",m->recipient,timestamp,m->content);
    fclose(fptrOut);
    free(m);
 }

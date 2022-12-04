@@ -7,6 +7,8 @@
 
 #elif defined (linux)
 
+
+
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
@@ -33,6 +35,8 @@ typedef struct in_addr IN_ADDR;
 #define MAX_FILENAME 30
 #define MAX_MESSAGES 1024
 #define BUF_SIZE    1024
+#define MAX_NAME 10
+#define MAX_NOTIFICATION 50
 
 #include "client.h"
 #include <time.h>
@@ -44,6 +48,14 @@ typedef struct
    char recipient[MAX_FILENAME];
    struct tm* timestamp;
 } Message;
+
+typedef struct
+{
+   char name[BUF_SIZE];
+   int size;
+   Client members[MAX_NAME];
+}Groupchat;
+
 static void init(void);
 static void end(void);
 static void app(void);
@@ -51,15 +63,21 @@ static int init_connection(void);
 static void end_connection(int sock);
 static int read_client(SOCKET sock, char *buffer);
 static void write_client(SOCKET sock, const char *buffer);
-static Message* create_message(const char* buffer, const char* sender, const char* recipient, int* nbCurrentMessage,Message* messages);
-static void send_message_to_all_clients(Client *clients, Client client, int actual, const char *buffer, char from_server);
 static void remove_client(Client *clients, int to_remove, int *actual);
 static void clear_clients(Client *clients, int actual);
-static char* get_name(const char* buffer);
-static int search_recipient(const char* buffer,Client * clients, int actual);
-static void send_message_to_specified_client(Client recipient,Client sender, const char* buffer);
-static void save_history(Message* message);
-static void load_history(Client client);
 static enum COMMANDS get_command(const char* buffer);
+static char* get_name(const char* buffer);
+static Message* create_message(const char* buffer, const char* sender, const char* recipient, int* nbCurrentMessage,Message* messages);
+static Groupchat* create_groupchat( char* members, Client creator, int actual,Client*clients,const char* name);
+static void send_message_to_all_clients(Client *clients, Client client, int actual, const char *buffer, char from_server);
+static int search_user_by_name(const char* buffer,Client * clients, int actual);
+static void send_message_to_specified_client(Client recipient,Client sender, const char* buffer);
+static void send_confirmation_message(Groupchat* gc);
+static void send_message_to_groupchat(Groupchat* groupchat, Client sender, Client *clients, char *buffer);
+static void save_history(Message* message);
+static void save_history_groupchat(Message* message,Groupchat* gc);
+static void load_history(Client client);
+static void add_member(Groupchat* gc, Client member);
+static void remove_member(Groupchat* gc, Client member);
 
 #endif /* guard */
